@@ -10,7 +10,7 @@ export function Header() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { profile, isAuthenticated, logout } = useAuth();
 
   const navigation = [
     { name: 'Trang chủ', href: '/' },
@@ -75,10 +75,10 @@ export function Header() {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
                   >
                     <div className="h-8 w-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center font-semibold">
-                      {user?.fullName?.[0] || 'U'}
+                      {profile?.full_name?.[0] || 'U'}
                     </div>
                     <span className="hidden sm:block text-sm font-medium">
-                      {user?.fullName || 'User'}
+                      {profile?.full_name || 'User'}
                     </span>
                   </button>
 
@@ -91,8 +91,8 @@ export function Header() {
                       />
                       <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-border shadow-lg z-50 overflow-hidden">
                         <div className="p-3 border-b border-border bg-[var(--muted)]">
-                          <p className="font-semibold text-sm">{user?.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{user?.email}</p>
+                          <p className="font-semibold text-sm">{profile?.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{profile?.email}</p>
                         </div>
                         
                         <div className="py-1">
