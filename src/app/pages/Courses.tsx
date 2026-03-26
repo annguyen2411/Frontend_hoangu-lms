@@ -1,251 +1,344 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { Search, Filter, Star, Play, Clock, BookOpen, Grid, List } from 'lucide-react';
-import { courses } from '../data/mockData';
-import { SmartSearchBar } from '../components/SmartSearchBar';
-import { AdvancedFilters } from '../components/AdvancedFilters';
-import { FilterChips } from '../components/FilterChips';
-import { smartSearch, SearchFilters } from '../utils/smartSearch';
+import { Search, Star, Play, Users, Award, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { courses, features, communityStats } from '../data/mockData';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { motion, AnimatePresence } from 'motion/react';
 
 export function Courses() {
-  const [filters, setFilters] = useState<Partial<SearchFilters>>({});
   const [filteredCourses, setFilteredCourses] = useState(courses);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000000]);
+  const [sortBy, setSortBy] = useState('popular');
+
+  const levels = ['Cơ bản', 'Trung cấp', 'Nâng cao'];
+  const sortOptions = [
+    { value: 'popular', label: 'Phổ biến nhất' },
+    { value: 'newest', label: 'Mới nhất' },
+    { value: 'price-low', label: 'Giá: Thấp đến cao' },
+    { value: 'price-high', label: 'Giá: Cao đến thấp' },
+    { value: 'rating', label: 'Đánh giá cao nhất' },
+  ];
 
   useEffect(() => {
-    // Apply filters
-    const results = smartSearch.search(
-      courses,
-      filters,
-      ['titleVi', 'title', 'description', 'teacher.name', 'teacher.nameVi']
-    );
-    setFilteredCourses(results);
+    let result = [...courses];
 
-    // Save search history
-    if (filters.query) {
-      smartSearch.saveSearchHistory(filters.query, filters, results.length);
-    }
-
-    // Update suggestions
-    if (filters.query && filters.query.length >= 2) {
-      const newSuggestions = smartSearch.getSuggestions(
-        filters.query,
-        courses,
-        ['titleVi', 'title'],
-        8
+    if (searchQuery) {
+      result = result.filter(
+        (c) =>
+          c.titleVi.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setSuggestions(newSuggestions);
-    } else {
-      setSuggestions([]);
     }
-  }, [filters]);
 
-  const handleSearch = (query: string) => {
-    setFilters({ ...filters, query });
-  };
-
-  const handleApplyFilters = (newFilters: Partial<SearchFilters>) => {
-    setFilters(newFilters);
-  };
-
-  const handleRemoveFilter = (key: keyof SearchFilters, value?: any) => {
-    const newFilters = { ...filters };
-    
-    if (key === 'levels' && value) {
-      newFilters.levels = newFilters.levels?.filter(l => l !== value);
-    } else if (key === 'duration' && value) {
-      newFilters.duration = newFilters.duration?.filter(d => d !== value);
-    } else {
-      delete newFilters[key];
+    if (selectedLevel) {
+      result = result.filter((c) => c.level === selectedLevel);
     }
-    
-    setFilters(newFilters);
-  };
 
-  const handleClearAll = () => {
-    setFilters({ query: filters.query }); // Keep search query
+    result = result.filter(
+      (c) => (c.salePrice || c.price) >= priceRange[0] && (c.salePrice || c.price) <= priceRange[1]
+    );
+
+    switch (sortBy) {
+      case 'price-low':
+        result.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
+        break;
+      case 'price-high':
+        result.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
+        break;
+      case 'rating':
+        result.sort((a, b) => b.rating - a.rating);
+        break;
+      case 'newest':
+        result.reverse();
+        break;
+      default:
+        break;
+    }
+
+    setFilteredCourses(result);
+  }, [searchQuery, selectedLevel, priceRange, sortBy]);
+
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'Cơ bản':
+        return 'bg-green-500';
+      case 'Trung cấp':
+        return 'bg-blue-500';
+      case 'Nâng cao':
+        return 'bg-purple-500';
+      default:
+        return 'bg-gray-500';
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      {/* Header - Modern Flat with High Contrast */}
-      <div className="bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Khóa học tiếng Hoa</h1>
-          <p className="text-xl text-white mb-8">
-            Khám phá {courses.length} khóa học chất lượng cao từ cơ bản đến nâng cao
-          </p>
-          
-          {/* Smart Search Bar */}
-          <div className="max-w-3xl">
-            <SmartSearchBar
-              placeholder="Tìm kiếm khóa học (VD: HSK 1, phát âm, giao tiếp...)"
-              onSearch={handleSearch}
-              suggestions={suggestions}
-              onFilterClick={() => setShowFilters(true)}
-            />
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Hero Section */}
+      <section className="relative bg-gradient-to-br from-[var(--primary)] via-[var(--primary)] to-red-800 text-white py-20 overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-yellow-300 rounded-full blur-3xl"></div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filter Chips & View Toggle */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <FilterChips
-            filters={filters}
-            onRemoveFilter={handleRemoveFilter}
-            onClearAll={handleClearAll}
-          />
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {filteredCourses.length} kết quả
-            </span>
-            <div className="flex gap-1 border-2 border-border rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-[var(--theme-primary)] text-white'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-[var(--theme-primary)] text-white'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <List className="h-4 w-4" />
-              </button>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Badge className="mb-6 bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+              <Award className="h-4 w-4 mr-1" />
+              Khóa học được chứng nhận HSK
+            </Badge>
+            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+              Khám phá khóa học tiếng Hoa
+            </h1>
+            <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+              {courses.length} khóa học chất lượng cao từ giảng viên bản xứ, phù hợp mọi trình độ
+            </p>
+
+            {/* Search Bar */}
+            <div className="max-w-2xl mx-auto relative">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm khóa học..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 rounded-2xl text-gray-900 placeholder-gray-400 shadow-xl focus:outline-none focus:ring-4 focus:ring-white/30"
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Stats Bar */}
+      <section className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{communityStats.totalStudents.toLocaleString()}+</div>
+                <div className="text-sm text-gray-500">Học viên</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                <Star className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{communityStats.averageRating}</div>
+                <div className="text-sm text-gray-500">Đánh giá</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                <Award className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{communityStats.successRate}%</div>
+                <div className="text-sm text-gray-500">Tỷ lệ thành công</div>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Courses Grid/List */}
-        {filteredCourses.length > 0 ? (
-          <div className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-              : 'space-y-4'
-          }>
-            {filteredCourses.map((course) => (
-              <Link
-                key={course.id}
-                to={`/courses/${course.slug}`}
-                className={`bg-card rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all group ${
-                  viewMode === 'list' ? 'flex' : ''
+      {/* Main Content */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Filter Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+          {/* Level Filters */}
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setSelectedLevel(null)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                selectedLevel === null
+                  ? 'bg-[var(--primary)] text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Tất cả
+            </button>
+            {levels.map((level) => (
+              <button
+                key={level}
+                onClick={() => setSelectedLevel(level)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  selectedLevel === level
+                    ? 'bg-[var(--primary)] text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                <div className={viewMode === 'list' ? 'w-64 flex-shrink-0' : 'relative pb-[56.25%]'}>
-                  <img
-                    src={course.thumbnail}
-                    alt={course.titleVi}
-                    className={`object-cover group-hover:scale-105 transition-transform duration-300 ${
-                      viewMode === 'list' ? 'h-full w-full' : 'absolute inset-0 w-full h-full'
-                    }`}
-                  />
-                  <div className="absolute top-3 left-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      course.hskLevel === 1
-                        ? 'bg-green-500 text-white'
-                        : course.hskLevel === 2
-                        ? 'bg-blue-500 text-white'
-                        : course.hskLevel === 3
-                        ? 'bg-purple-500 text-white'
-                        : course.hskLevel === 4
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-red-500 text-white'
-                    }`}>
+                {level}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] cursor-pointer"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Results Count */}
+        <div className="mb-6 text-gray-600">
+          Hiển thị <span className="font-semibold text-gray-900">{filteredCourses.length}</span> khóa học
+          {selectedLevel && (
+            <span>
+              {' '}
+              /{' '}
+              <button
+                onClick={() => setSelectedLevel(null)}
+                className="text-[var(--primary)] hover:underline"
+              >
+                Xem tất cả
+              </button>
+            </span>
+          )}
+        </div>
+
+        {/* Courses Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AnimatePresence mode="popLayout">
+            {filteredCourses.map((course, index) => (
+              <motion.div
+                key={course.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+              >
+                <Link
+                  to={`/courses/${course.slug}`}
+                  className="group block bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative pb-[56.25%] overflow-hidden">
+                    <img
+                      src={course.thumbnail}
+                      alt={course.titleVi}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    {/* Level Badge */}
+                    <span
+                      className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold text-white ${getLevelColor(
+                        course.level
+                      )}`}
+                    >
                       {course.level}
                     </span>
-                  </div>
-                </div>
 
-                <div className="p-6 flex-1">
-                  <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-[var(--theme-primary)] transition-colors line-clamp-2">
-                    {course.titleVi}
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                    {course.title}
-                  </p>
-
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-semibold text-foreground">{course.rating}</span>
-                      <span>({course.totalReviews})</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <BookOpen className="h-4 w-4" />
-                      <span>{course.totalLessons} bài</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{course.duration}</span>
+                    {/* Play Button */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                        <Play className="h-6 w-6 text-[var(--primary)] fill-[var(--primary)] ml-1" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      {course.salePrice ? (
-                        <>
-                          <span className="text-2xl font-bold text-[var(--theme-primary)]">
-                            {course.salePrice.toLocaleString('vi-VN')}đ
-                          </span>
-                          <span className="text-sm text-muted-foreground line-through ml-2">
-                            {course.price.toLocaleString('vi-VN')}đ
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-2xl font-bold text-[var(--theme-primary)]">
-                          {course.price.toLocaleString('vi-VN')}đ
+                  {/* Content */}
+                  <div className="p-5">
+                    {/* Title */}
+                    <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-[var(--primary)] transition-colors">
+                      {course.titleVi}
+                    </h3>
+
+                    {/* Teacher */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <img
+                        src={course.teacher.avatar}
+                        alt={course.teacher.name}
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                      <span className="text-sm text-gray-600">{course.teacher.name}</span>
+                      {course.teacher.isNative && (
+                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                          Bản xứ
                         </span>
                       )}
                     </div>
-                    <div className="w-10 h-10 bg-gradient-to-br from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Play className="h-5 w-5 text-white fill-white" />
+
+                    {/* Meta Info */}
+                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                      <div className="flex items-center gap-1">
+                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        <span className="font-semibold text-gray-900">{course.rating}</span>
+                        <span>({course.totalReviews})</span>
+                      </div>
+                      <div>{course.totalLessons} bài</div>
+                      <div>{course.duration}</div>
+                    </div>
+
+                    {/* Price & CTA */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div>
+                        {course.salePrice ? (
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xl font-bold text-[var(--primary)]">
+                              {course.salePrice.toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-sm text-gray-400 line-through">
+                              {course.price.toLocaleString('vi-VN')}đ
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xl font-bold text-[var(--primary)]">
+                            {course.price.toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        Xem chi tiết
+                      </Button>
                     </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </motion.div>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-foreground mb-2">
-              Không tìm thấy khóa học
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm
-            </p>
-            <button
-              onClick={handleClearAll}
-              className="px-6 py-3 bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
-            >
+          </AnimatePresence>
+        </div>
+
+        {/* Empty State */}
+        {filteredCourses.length === 0 && (
+          <div className="text-center py-20">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="h-10 w-10 text-gray-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Không tìm thấy khóa học</h3>
+            <p className="text-gray-500 mb-6">Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm</p>
+            <Button onClick={() => { setSearchQuery(''); setSelectedLevel(null); }}>
               Xóa bộ lọc
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-
-      {/* Advanced Filters Modal */}
-      <AdvancedFilters
-        isOpen={showFilters}
-        onClose={() => setShowFilters(false)}
-        onApply={handleApplyFilters}
-        initialFilters={filters}
-      />
+      </section>
     </div>
   );
 }
