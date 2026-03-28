@@ -1,6 +1,7 @@
 // Admin authentication utility
 
-import { AdminUser, adminUsers } from '../data/adminData';
+import { AdminUser } from '../data/adminData';
+import { api } from '../../lib/api';
 
 const ADMIN_STORAGE_KEY = 'hoanguy_admin';
 
@@ -17,19 +18,38 @@ export const adminAuthUtils = {
     return JSON.parse(adminData);
   },
 
-  // Admin login
-  adminLogin(email: string, password: string): AdminUser | null {
-    // Mock admin login - only accept admin@hoanguy.edu.vn
-    if (email === 'admin@hoanguy.edu.vn' && password.length > 0) {
-      const admin = adminUsers[0];
-      localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(admin));
-      return admin;
+  // Admin login - use real API
+  async adminLogin(email: string, password: string): Promise<AdminUser | null> {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      if (response.success && response.data) {
+        const user = response.data.user;
+        if (user.role === 'admin' || user.role === 'super_admin') {
+          localStorage.setItem('auth_token', response.data.token);
+          localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({
+            id: user.id,
+            email: user.email,
+            name: user.full_name,
+            role: user.role
+          }));
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.full_name,
+            role: user.role
+          };
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Admin login error:', error);
+      return null;
     }
-    return null;
   },
 
   // Admin logout
   adminLogout(): void {
     localStorage.removeItem(ADMIN_STORAGE_KEY);
+    localStorage.removeItem('auth_token');
   }
 };

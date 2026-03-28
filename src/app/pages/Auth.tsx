@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { Mail, Lock, User, Facebook, Chrome, Phone } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
 export function Auth() {
+  const navigate = useNavigate();
+  const { login, register, isLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -14,39 +16,64 @@ export function Auth() {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    if (isLogin) {
-      if (!formData.email || !formData.password) {
-        setError('Vui lòng điền đầy đủ thông tin');
-        return;
+    try {
+      if (isLogin) {
+        if (!formData.email || !formData.password) {
+          setError('Vui lòng điền đầy đủ thông tin');
+          setLoading(false);
+          return;
+        }
+
+        const { error: loginError } = await login(formData.email, formData.password);
+        
+        if (loginError) {
+          setError(loginError.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+          setError('Vui lòng điền đầy đủ thông tin');
+          setLoading(false);
+          return;
+        }
+
+        if (formData.password.length < 6) {
+          setError('Mật khẩu phải có ít nhất 6 ký tự');
+          setLoading(false);
+          return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+          setError('Mật khẩu xác nhận không khớp');
+          setLoading(false);
+          return;
+        }
+
+        const { error: registerError } = await register(formData.name, formData.email, formData.password);
+        
+        if (registerError) {
+          setError(registerError.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+        } else {
+          navigate('/dashboard');
+        }
       }
-      authUtils.login(formData.email, formData.password);
-      window.dispatchEvent(new Event('auth-change'));
-      navigate('/dashboard');
-    } else {
-      if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-        setError('Vui lòng điền đầy đủ thông tin');
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setError('Mật khẩu xác nhận không khớp');
-        return;
-      }
-      authUtils.register(formData.name, formData.email, formData.password);
-      window.dispatchEvent(new Event('auth-change'));
-      navigate('/dashboard');
+    } catch (err) {
+      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider: string) => {
-    authUtils.login(`user@${provider}.com`, 'password');
-    window.dispatchEvent(new Event('auth-change'));
-    navigate('/dashboard');
+    setError('Tính năng đăng nhập mạng xã hội sẽ sớm được cập nhật.');
   };
 
   return (
@@ -129,7 +156,7 @@ export function Auth() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 fullWidth
-                helperText={!isLogin ? "Tối thiểu 8 ký tự" : undefined}
+                helperText={!isLogin ? "Tối thiểu 6 ký tự" : undefined}
               />
 
               {!isLogin && (
@@ -151,14 +178,14 @@ export function Auth() {
                     <input type="checkbox" className="rounded border-border" />
                     <span className="text-muted-foreground">Ghi nhớ đăng nhập</span>
                   </label>
-                  <a href="#" className="text-[var(--primary)] hover:underline font-medium">
+                  <Link to="/forgot-password" className="text-[var(--primary)] hover:underline font-medium">
                     Quên mật khẩu?
-                  </a>
+                  </Link>
                 </div>
               )}
 
-              <Button type="submit" size="lg" fullWidth>
-                {isLogin ? 'Đăng nhập' : 'Đăng ký'}
+              <Button type="submit" size="lg" fullWidth disabled={loading}>
+                {loading ? 'Đang xử lý...' : isLogin ? 'Đăng nhập' : 'Đăng ký'}
               </Button>
             </form>
 
@@ -177,6 +204,7 @@ export function Auth() {
                   variant="outline"
                   onClick={() => handleSocialLogin('google')}
                   className="flex items-center justify-center"
+                  disabled
                 >
                   <Chrome className="h-5 w-5" />
                 </Button>
@@ -184,6 +212,7 @@ export function Auth() {
                   variant="outline"
                   onClick={() => handleSocialLogin('facebook')}
                   className="flex items-center justify-center"
+                  disabled
                 >
                   <Facebook className="h-5 w-5" />
                 </Button>
@@ -191,6 +220,7 @@ export function Auth() {
                   variant="outline"
                   onClick={() => handleSocialLogin('phone')}
                   className="flex items-center justify-center"
+                  disabled
                 >
                   <Phone className="h-5 w-5" />
                 </Button>
@@ -200,11 +230,11 @@ export function Auth() {
             {!isLogin && (
               <p className="mt-6 text-center text-xs text-muted-foreground">
                 Bằng việc đăng ký, bạn đồng ý với{' '}
-                <a href="#" className="text-[var(--primary)] hover:underline">
+                <a href="/terms" className="text-[var(--primary)] hover:underline">
                   Điều khoản dịch vụ
                 </a>{' '}
                 và{' '}
-                <a href="#" className="text-[var(--primary)] hover:underline">
+                <a href="/privacy" className="text-[var(--primary)] hover:underline">
                   Chính sách bảo mật
                 </a>
               </p>

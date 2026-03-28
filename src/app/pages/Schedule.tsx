@@ -1,29 +1,28 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import { Calendar, Target, Clock, Zap, TrendingUp, Settings } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { StudyCalendar } from '../components/StudyCalendar';
 import { StudyReminderSettings } from '../components/StudyReminderSettings';
 import { GoalSettingModal } from '../components/GoalSettingModal';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { smartScheduler } from '../utils/smartScheduler';
+import { LoginPrompt, LoadingSpinner } from '../components/LoginPrompt';
 
 export function Schedule() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'reminders'>('calendar');
   const [learningPattern, setLearningPattern] = useState(smartScheduler.getLearningPattern());
   const [goals, setGoals] = useState(smartScheduler.getStudyGoals());
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
+    setLoading(false);
+  }, []);
 
-  if (!user) return null;
+  if (loading || isLoading) return <LoadingSpinner />;
+  if (!user) return <LoginPrompt />;
 
   const handleGenerateSchedule = () => {
     smartScheduler.generateSmartSchedule(14); // Generate 2 weeks

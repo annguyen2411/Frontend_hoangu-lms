@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Users, Search, Plus, TrendingUp, UserPlus, MessageCircle } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useNavigate, Link } from 'react-router';
+import { Users, Search, Plus, TrendingUp, UserPlus, MessageCircle, LogIn } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { socialSystem } from '../utils/socialSystem';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -10,22 +10,56 @@ import { SocialFeed } from '../components/SocialFeed';
 import { StudyGroupCard } from '../components/StudyGroupCard';
 import { ActivityFeed } from '../components/ActivityFeed';
 
+function LoginPrompt() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center max-w-md mx-auto p-8">
+        <div className="w-20 h-20 bg-gradient-to-br from-red-600 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <LogIn className="h-10 w-10 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Đăng nhập để tiếp tục</h2>
+        <p className="text-gray-600 mb-6">
+          Bạn cần đăng nhập trước khi tiếp tục trải nghiệm các tính năng cộng đồng của HoaNgữ LMS.
+        </p>
+        <div className="flex gap-4 justify-center">
+          <Link to="/?mode=login">
+            <Button className="px-8">Đăng nhập</Button>
+          </Link>
+          <Link to="/?mode=register">
+            <Button variant="outline" className="px-8">Đăng ký</Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Community() {
   const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'feed' | 'groups' | 'activities'>('feed');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
+  const [showLoginPrompt, setShowLoginPrompt] = useState(!isAuthenticated && !isLoading);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
+    if (isLoading) return;
+    if (!user || !isAuthenticated) {
+      setShowLoginPrompt(true);
+    } else {
+      setShowLoginPrompt(false);
+      generateSampleData();
     }
+  }, [user, isAuthenticated, isLoading]);
 
-    // Generate sample data
-    generateSampleData();
-  }, [user, navigate]);
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div></div>;
+  }
+
+  if (showLoginPrompt) {
+    return <LoginPrompt />;
+  }
 
   const generateSampleData = () => {
     // Check if data already exists

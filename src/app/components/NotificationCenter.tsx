@@ -2,55 +2,89 @@ import { useState, useEffect } from 'react';
 import { Bell, Check, Trash2, Settings, X } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { notificationSystem, Notification } from '../utils/notificationSystem';
+import { api } from '../../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router';
 
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: any;
+  is_read: boolean;
+  created_at: string;
+}
+
 export function NotificationCenter() {
+  const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadNotifications();
-
-    // Subscribe to notification changes
-    const unsubscribe = notificationSystem.subscribe(() => {
+    if (isAuthenticated) {
       loadNotifications();
-    });
+    }
+  }, [isAuthenticated]);
 
-    return () => unsubscribe();
-  }, []);
-
-  const loadNotifications = () => {
-    setNotifications(notificationSystem.getAll());
-    setUnreadCount(notificationSystem.getUnreadCount());
-  };
-
-  const handleMarkAsRead = (id: string) => {
-    notificationSystem.markAsRead(id);
-  };
-
-  const handleMarkAllAsRead = () => {
-    notificationSystem.markAllAsRead();
-  };
-
-  const handleDelete = (id: string) => {
-    notificationSystem.delete(id);
-  };
-
-  const handleClearAll = () => {
-    if (confirm('Bạn có chắc muốn xóa tất cả thông báo?')) {
-      notificationSystem.clearAll();
+  const loadNotifications = async () => {
+    if (!isAuthenticated) return;
+    try {
+      setLoading(true);
+      const response = await api.notifications.getAll();
+      if (response.success && response.data) {
+        setNotifications(response.data);
+        setUnreadCount(response.unreadCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await api.notifications.markRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.notifications.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.notifications.delete(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const handleClearAll = async () => {
+    // Just close the dropdown for now
+  };
+
   const filteredNotifications = activeTab === 'unread'
-    ? notifications.filter(n => !n.read)
+    ? notifications.filter(n => !n.is_read)
     : notifications;
 
-  const getNotificationIcon = (type: Notification['type']) => {
+  const getNotificationIcon = (type: string) => {
     const icons = {
       success: '✅',
       error: '❌',
@@ -64,7 +98,7 @@ export function NotificationCenter() {
     return icons[type] || 'ℹ️';
   };
 
-  const getNotificationColor = (type: Notification['type']) => {
+  const getNotificationColor = (type: string) => {
     const colors = {
       success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
       error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
@@ -213,7 +247,7 @@ export function NotificationCenter() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
                         className={`p-3 rounded-lg border transition-all ${
-                          notification.read
+                          notification.is_read
                             ? 'bg-card border-border'
                             : getNotificationColor(notification.type)
                         }`}
@@ -227,7 +261,7 @@ export function NotificationCenter() {
                               <h4 className="font-semibold text-foreground text-sm">
                                 {notification.title}
                               </h4>
-                              {!notification.read && (
+                              {!notification.is_read && (
                                 <div className="w-2 h-2 bg-[var(--theme-primary)] rounded-full flex-shrink-0 mt-1" />
                               )}
                             </div>
@@ -251,7 +285,7 @@ export function NotificationCenter() {
                                     {notification.actionLabel || 'Xem'}
                                   </Link>
                                 )}
-                                {!notification.read && (
+                                {!notification.is_read && (
                                   <button
                                     onClick={() => handleMarkAsRead(notification.id)}
                                     className="text-xs text-muted-foreground hover:text-foreground"

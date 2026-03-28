@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { BookOpen, TrendingUp, Award, Calendar, Clock, Play, Target, Flame, ShoppingBag, Settings, Users, Zap, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { authUtils } from '../utils/auth';
-import { courses } from '../data/mockData';
+import { useAuth } from '../contexts/AuthContext';
+import { useCourses, useEnrollments } from '../hooks/useData';
 import { RecommendationsPanel } from '../components/RecommendationsPanel';
 import { AdvancedSearch } from '../components/AdvancedSearch';
 import { dataExport } from '../utils/dataExport';
@@ -11,36 +11,47 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { LoginPrompt } from '../components/LoginPrompt';
 
 export function Dashboard() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { profile, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { courses, loading: coursesLoading } = useCourses({ publishedOnly: true });
+  const { enrollments, loading: enrollmentsLoading } = useEnrollments(profile?.id);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
+  // Debug log
+  console.log('Dashboard - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated, 'profile:', profile);
 
   const handleExportData = () => {
     dataExport.downloadReport();
     toast.success('Đã xuất báo cáo học tập!');
   };
 
-  const handleSearch = (query: string, filters: any) => {
+  const handleSearch = (query: string, filters: unknown) => {
     console.log('Search:', query, filters);
-    // Handle search results here
     toast.info(`Tìm kiếm: ${query}`);
   };
 
-  if (!user) return null;
+  if (authLoading || !profile) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-8 bg-[var(--primary)] rounded-full animate-bounce"></div>
+          <p className="mt-4 text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const enrolledCourses = courses.filter(c => user.enrolledCourses.includes(c.id));
-  const totalProgress = Object.values(user.progress).reduce((a, b) => a + b, 0) / user.enrolledCourses.length || 0;
+  const enrolledCourses = courses.filter(c => 
+    enrollments.some(e => e.course_id === c.id)
+  );
+  
+  const totalProgress = enrollments.length > 0
+    ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length
+    : 0;
 
-  // Mock data for chart
   const weeklyData = [
     { id: 'mon', day: 'T2', hours: 1.5 },
     { id: 'tue', day: 'T3', hours: 2.0 },
@@ -57,7 +68,7 @@ export function Dashboard() {
     { id: 3, title: 'Flashcard: Từ vựng bài 1-5', course: 'HSK 1', time: '20:00', duration: '10 phút' }
   ];
 
-  const streakDays = 7;
+  const streakDays = profile?.streak || 0;
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -65,7 +76,7 @@ export function Dashboard() {
         {/* Welcome Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Xin chào, {user.name}! 👋
+            Xin chào, {profile?.full_name || 'Học viên'}!
           </h1>
           <p className="text-muted-foreground">
             Hãy tiếp tục hành trình học tiếng Hoa của bạn
@@ -78,10 +89,10 @@ export function Dashboard() {
             <Card padding="md" className="sticky top-24">
               <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] flex items-center justify-center text-white text-2xl font-bold">
-                  {user.name[0]}
+                  {profile?.full_name?.[0] || 'H'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground">{user.name}</h3>
+                  <h3 className="font-bold text-foreground">{profile?.full_name || 'Học viên'}</h3>
                   <Badge variant="primary" size="sm">Học viên</Badge>
                 </div>
               </div>
@@ -165,7 +176,9 @@ export function Dashboard() {
           <main className="flex-1">
             {/* Welcome Section */}
             <div className="bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] rounded-xl shadow-lg text-white p-8 mb-8">
-              <h1 className="text-3xl font-extrabold mb-2 drop-shadow-lg">Chào {user.name}! 👋</h1>
+              <h1 className="text-3xl font-extrabold mb-2 drop-shadow-lg">
+                Chào {profile?.full_name || 'Học viên'}!
+              </h1>
               <p className="font-semibold mb-6 drop-shadow-md">
                 Hôm nay là {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
@@ -178,16 +191,16 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="bg-gray-900/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                  <div className="text-3xl font-bold mb-1">{enrolledCourses.length}</div>
-                  <div className="text-sm font-semibold">Khóa học</div>
+                  <div className="text-3xl font-bold mb-1">{profile?.level || 1}</div>
+                  <div className="text-sm font-semibold">Level</div>
                 </div>
                 <div className="bg-gray-900/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                  <div className="text-3xl font-bold mb-1">{Math.round(totalProgress)}%</div>
-                  <div className="text-sm font-semibold">Tiến độ</div>
+                  <div className="text-3xl font-bold mb-1">{profile?.xp || 0}</div>
+                  <div className="text-sm font-semibold">XP</div>
                 </div>
                 <div className="bg-gray-900/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                  <div className="text-3xl font-bold mb-1">13.5</div>
-                  <div className="text-sm font-semibold">Giờ học</div>
+                  <div className="text-3xl font-bold mb-1">{profile?.coins || 0}</div>
+                  <div className="text-sm font-semibold">Xu</div>
                 </div>
               </div>
             </div>
@@ -239,42 +252,51 @@ export function Dashboard() {
                 <h2 className="text-2xl font-bold text-foreground mb-6">Khóa học của tôi</h2>
                 <div className="space-y-4">
                   {enrolledCourses.length > 0 ? (
-                    enrolledCourses.map((course) => (
-                      <div key={course.id} className="border border-border rounded-lg p-4">
-                        <div className="flex items-start gap-4">
-                          <img
-                            src={course.thumbnail}
-                            alt={course.titleVi}
-                            className="w-20 h-20 rounded-lg object-cover"
-                          />
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-foreground mb-2 line-clamp-1">
-                              {course.titleVi}
-                            </h3>
-                            <div className="mb-2">
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span className="text-muted-foreground">Tiến độ</span>
-                                <span className="font-semibold text-[var(--theme-primary)]">
-                                  {user.progress[course.id] || 0}%
-                                </span>
+                    enrolledCourses.map((course) => {
+                      const enrollment = enrollments.find(e => e.course_id === course.id);
+                      return (
+                        <div key={course.id} className="border border-border rounded-lg p-4">
+                          <div className="flex items-start gap-4">
+                            {course.thumbnail_url ? (
+                              <img
+                                src={course.thumbnail_url}
+                                alt={course.title}
+                                className="w-20 h-20 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
+                                <BookOpen className="h-8 w-8 text-[var(--primary)]" />
                               </div>
-                              <div className="w-full bg-muted rounded-full h-2">
-                                <div
-                                  className="bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] h-2 rounded-full transition-all"
-                                  style={{ width: `${user.progress[course.id] || 0}%` }}
-                                />
+                            )}
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-foreground mb-2 line-clamp-1">
+                                {course.title}
+                              </h3>
+                              <div className="mb-2">
+                                <div className="flex items-center justify-between text-sm mb-1">
+                                  <span className="text-muted-foreground">Tiến độ</span>
+                                  <span className="font-semibold text-[var(--theme-primary)]">
+                                    {enrollment?.progress || 0}%
+                                  </span>
+                                </div>
+                                <div className="w-full bg-muted rounded-full h-2">
+                                  <div
+                                    className="bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] h-2 rounded-full transition-all"
+                                    style={{ width: `${enrollment?.progress || 0}%` }}
+                                  />
+                                </div>
                               </div>
+                              <Link
+                                to={`/courses/${course.slug}`}
+                                className="text-sm text-[var(--theme-primary)] hover:opacity-80 font-semibold"
+                              >
+                                Tiếp tục học →
+                              </Link>
                             </div>
-                            <Link
-                              to={`/courses/${course.slug}`}
-                              className="text-sm text-[var(--theme-primary)] hover:opacity-80 font-semibold"
-                            >
-                              Tiếp tục học →
-                            </Link>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="text-center py-8">
                       <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
@@ -398,3 +420,5 @@ export function Dashboard() {
     </div>
   );
 }
+
+export default Dashboard;

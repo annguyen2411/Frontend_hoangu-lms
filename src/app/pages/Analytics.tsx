@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import { BarChart3, TrendingUp, Download } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { PerformanceStats } from '../components/PerformanceStats';
 import { StudyTimeChart } from '../components/StudyTimeChart';
@@ -9,20 +8,17 @@ import { SkillRadarChart } from '../components/SkillRadarChart';
 import { ProgressLineChart } from '../components/ProgressLineChart';
 import { WeeklyReport } from '../components/WeeklyReport';
 import { progressTracker } from '../utils/progressTracker';
+import { LoginPrompt, LoadingSpinner } from '../components/LoginPrompt';
 
 export function Analytics() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'weekly'>('overview');
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-
-    // Generate sample data if none exists
     generateSampleData();
-  }, [user, navigate]);
+    setLoading(false);
+  }, []);
 
   const generateSampleData = () => {
     const sessions = progressTracker.getStudySessions();
@@ -88,7 +84,8 @@ export function Analytics() {
     URL.revokeObjectURL(url);
   };
 
-  if (!user) return null;
+  if (loading || isLoading) return <LoadingSpinner />;
+  if (!user) return <LoginPrompt />;
 
   return (
     <div className="min-h-screen bg-background">

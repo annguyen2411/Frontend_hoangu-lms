@@ -2,12 +2,12 @@ import { Share2, Facebook, Twitter, Link2, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface SocialShareProps {
-  achievement: {
+  achievement?: {
     title: string;
     description: string;
     icon: string;
   };
-  userStats: {
+  userStats?: {
     level: number;
     xp: number;
     badges: number;
@@ -19,15 +19,15 @@ export function SocialShare({ achievement, userStats }: SocialShareProps) {
   const [copied, setCopied] = useState(false);
 
   const shareUrl = window.location.origin;
-  const shareText = `🎉 Tôi vừa đạt được "${achievement.title}" trên HoaNgữ! 
+  const shareText = achievement ? `🎉 Tôi vừa đạt được "${achievement.title}" trên HoaNgữ! 
   
-${achievement.icon} ${achievement.description}
+  ${achievement.icon} ${achievement.description}
   
-📊 Cấp độ: ${userStats.level}
-⚡ Kinh nghiệm: ${userStats.xp.toLocaleString()} XP
-🏆 Huy hiệu: ${userStats.badges}
-
-Học tiếng Hoa cùng tôi tại HoaNgữ!`;
+  📊 Cấp độ: ${userStats?.level || 1}
+  ⚡ Kinh nghiệm: ${userStats?.xp?.toLocaleString() || 0} XP
+  🏆 Huy hiệu: ${userStats?.badges || 0}
+  
+  Học tiếng Hoa cùng tôi tại HoaNgữ!` : `Học tiếng Hoa cùng tôi tại HoaNgữ!`;
 
   const handleShare = (platform: string) => {
     const encodedText = encodeURIComponent(shareText);
@@ -89,10 +89,10 @@ Học tiếng Hoa cùng tôi tại HoaNgữ!`;
           <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl z-50 overflow-hidden border border-gray-200 animate-scale-in">
             {/* Preview Card */}
             <div className="bg-gradient-to-r from-red-600 to-yellow-500 p-4 text-white">
-              <div className="text-4xl mb-2 text-center">{achievement.icon}</div>
-              <h4 className="font-bold text-center mb-1">{achievement.title}</h4>
+              <div className="text-4xl mb-2 text-center">{achievement?.icon || '🏆'}</div>
+              <h4 className="font-bold text-center mb-1">{achievement?.title || 'Thành tựu'}</h4>
               <p className="text-xs text-white/90 text-center">
-                Cấp {userStats.level} • {userStats.badges} huy hiệu
+                Cấp {userStats?.level || 1} • {userStats?.badges || 0} huy hiệu
               </p>
             </div>
 

@@ -1,23 +1,27 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, Loader2 } from 'lucide-react';
 import { adminAuthUtils } from '../../utils/adminAuth';
 
 export function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    const admin = adminAuthUtils.adminLogin(email, password);
+    const admin = await adminAuthUtils.adminLogin(email, password);
+    setLoading(false);
+    
     if (admin) {
       navigate('/admin/dashboard');
     } else {
-      setError('Email hoặc mật khẩu không đúng. Chỉ admin@hoanguy.edu.vn được phép truy cập.');
+      setError('Email hoặc mật khẩu không đúng. Chỉ admin mới được phép truy cập.');
     }
   };
 
@@ -82,17 +86,19 @@ export function AdminLogin() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-lg font-bold text-lg hover:opacity-90 transition-opacity"
+                disabled={loading}
+                className="w-full py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-lg font-bold text-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Đăng nhập
+                {loading ? <Loader2 className="animate-spin" /> : null}
+                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </form>
 
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-sm text-gray-500 text-center">
                 <strong>Demo credentials:</strong><br />
-                Email: admin@hoanguy.edu.vn<br />
-                Password: bất kỳ mật khẩu nào
+                Email: admin@hoangu.com<br />
+                Password: admin123
               </p>
             </div>
           </div>

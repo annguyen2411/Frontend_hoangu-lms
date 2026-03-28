@@ -1,23 +1,32 @@
 import { useState } from 'react';
 import { Search, Download, Eye, CheckCircle, XCircle } from 'lucide-react';
-import { orders } from '../../data/adminData';
+import { useAdminOrders } from '../../hooks/useAdmin';
 
 export function AdminOrders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const { orders, loading, updateOrderStatus, refetch } = useAdminOrders();
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.courseName.toLowerCase().includes(searchTerm.toLowerCase());
+      (order.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      order.user_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.course_id?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const totalRevenue = filteredOrders
     .filter((o) => o.status === 'completed')
-    .reduce((sum, o) => sum + o.amount, 0);
+    .reduce((sum, o) => sum + (o.amount_vnd || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -90,7 +99,7 @@ export function AdminOrders() {
                   Mã đơn
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Học viên
+                  User ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Khóa học
@@ -112,77 +121,79 @@ export function AdminOrders() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-semibold text-gray-900">{order.orderId}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-gray-900">{order.studentName}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-gray-900">{order.courseName}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-semibold text-gray-900">
-                      {order.amount.toLocaleString()}đ
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
-                      {order.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                    {new Date(order.date).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        order.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : order.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {order.status === 'completed'
-                        ? 'Hoàn thành'
-                        : order.status === 'pending'
-                        ? 'Chờ xử lý'
-                        : 'Đã hủy'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Xem chi tiết"
+              <tbody className="divide-y divide-gray-200">
+                {filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="font-semibold text-gray-900">{order.id.slice(0, 8)}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-gray-900">{order.user_id.slice(0, 8)}...</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-gray-900">{order.course_id ? order.course_id.slice(0, 8) + '...' : 'N/A'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="font-semibold text-gray-900">
+                        {(order.amount_vnd || 0).toLocaleString()}đ
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
+                        {order.payment_method}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                      {new Date(order.created_at).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          order.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : order.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
                       >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      {order.status === 'pending' && (
-                        <>
-                          <button
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Xác nhận"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Hủy"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                        {order.status === 'completed'
+                          ? 'Hoàn thành'
+                          : order.status === 'pending'
+                          ? 'Chờ xử lý'
+                          : 'Đã hủy'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Xem chi tiết"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {order.status === 'pending' && (
+                          <>
+                            <button
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Xác nhận"
+                              onClick={() => updateOrderStatus(order.id, 'completed')}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                            <button
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Hủy"
+                              onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
           </table>
         </div>
       </div>

@@ -1,12 +1,20 @@
 import { TrendingUp, Award, Coins } from 'lucide-react';
-import type { UserStats } from '../../data/questsData';
 
 interface UserStatsBarProps {
-  stats: UserStats;
+  stats: {
+    level: number;
+    xp: number;
+    xpToNextLevel: number;
+    coins: number;
+    badges: string[];
+    completedQuests: number;
+  };
 }
 
 export function UserStatsBar({ stats }: UserStatsBarProps) {
-  const xpPercentage = (stats.xp / stats.xpToNextLevel) * 100;
+  if (!stats) return null;
+  const xpToNextLevel = stats.xpToNextLevel || stats.xp_to_next_level || 100;
+  const xpPercentage = (stats.xp / xpToNextLevel) * 100;
 
   return (
     <div className="bg-gradient-to-r from-red-600 to-yellow-500 rounded-xl shadow-lg text-white p-6 mb-6">
@@ -21,7 +29,7 @@ export function UserStatsBar({ stats }: UserStatsBarProps) {
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-bold text-lg">Cấp độ {stats.level}</h3>
                 <span className="text-sm text-white">
-                  {stats.xp}/{stats.xpToNextLevel} XP
+                  {stats.xp}/{xpToNextLevel} XP
                 </span>
               </div>
               <div className="w-full bg-gray-900/50 rounded-full h-3 overflow-hidden border border-white/20">
@@ -31,7 +39,7 @@ export function UserStatsBar({ stats }: UserStatsBarProps) {
                 />
               </div>
               <p className="text-xs text-white/90 mt-1">
-                Còn {stats.xpToNextLevel - stats.xp} XP để lên cấp {stats.level + 1}
+                Còn {xpToNextLevel - stats.xp} XP để lên cấp {stats.level + 1}
               </p>
             </div>
           </div>
@@ -47,13 +55,13 @@ export function UserStatsBar({ stats }: UserStatsBarProps) {
 
           <div className="bg-gray-900/60 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
             <Award className="h-5 w-5 mx-auto mb-1 text-yellow-300" />
-            <div className="font-bold text-lg">{stats.badges.length}</div>
+            <div className="font-bold text-lg">0</div>
             <div className="text-xs text-white">Huy hiệu</div>
           </div>
 
           <div className="bg-gray-900/60 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
             <TrendingUp className="h-5 w-5 mx-auto mb-1 text-green-300" />
-            <div className="font-bold text-lg">{stats.completedQuests}</div>
+            <div className="font-bold text-lg">{stats.completed_quests || 0}</div>
             <div className="text-xs text-white">Nhiệm vụ</div>
           </div>
         </div>

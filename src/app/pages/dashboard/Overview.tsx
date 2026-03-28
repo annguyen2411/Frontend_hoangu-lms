@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { BookOpen, TrendingUp, Award, Calendar, Clock, Play, Target, Flame, Zap, Download, X } from 'lucide-react';
+import { BookOpen, TrendingUp, Award, Calendar, Clock, Play, Target, Flame, Zap, Download, X, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { authUtils } from '../../utils/auth';
-import { courses } from '../../data/mockData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCourses, useEnrollments } from '../../hooks/useData';
 import { RecommendationsPanel } from '../../components/RecommendationsPanel';
 import { AdvancedSearch } from '../../components/AdvancedSearch';
 import { dataExport } from '../../utils/dataExport';
@@ -14,10 +14,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Badge } from '../../components/ui/Badge';
 
 export function Overview() {
-  const user = authUtils.getCurrentUser();
+  const { profile, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { courses, loading: coursesLoading, error: coursesError } = useCourses({ publishedOnly: true });
+  const { enrollments, loading: enrollmentsLoading, error: enrollmentsError } = useEnrollments(profile?.id);
+  
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<unknown[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleExportData = () => {
@@ -26,11 +29,10 @@ export function Overview() {
   };
 
   const handleSearch = (query: string, filters: SearchFilters) => {
-    // Search trong courses
     const results = searchEngine.search(
       courses,
       query,
-      ['titleVi', 'titleZh', 'description', 'instructor'],
+      ['title', 'description', 'teacher_name'],
       filters
     );
     
@@ -45,12 +47,38 @@ export function Overview() {
     }
   };
 
-  if (!user) return null;
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-8 bg-[var(--primary)] rounded-full animate-bounce"></div>
+          <p className="mt-4 text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const enrolledCourses = courses.filter(c => user.enrolledCourses.includes(c.id));
-  const totalProgress = Object.values(user.progress).reduce((a, b) => a + b, 0) / user.enrolledCourses.length || 0;
+  if (coursesError || enrollmentsError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Lỗi tải dữ liệu</h3>
+          <p className="text-gray-500 mb-4">Không thể tải thông tin. Vui lòng thử lại.</p>
+          <Button onClick={() => window.location.reload()}>Thử lại</Button>
+        </div>
+      </div>
+    );
+  }
 
-  // Mock data for chart
+  const enrolledCourses = courses.filter(c => 
+    enrollments.some(e => e.course_id === c.id)
+  );
+  
+  const totalProgress = enrollments.length > 0
+    ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length
+    : 0;
+
   const weeklyData = [
     { id: 'mon', day: 'T2', hours: 1.5 },
     { id: 'tue', day: 'T3', hours: 2.0 },
@@ -63,11 +91,10 @@ export function Overview() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] rounded-2xl p-6 sm:p-8 text-white">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Xin chào, {user.name}! 👋</h1>
+            <h1 className="text-3xl font-bold mb-2">Xin chào, {profile?.full_name || 'Học viên'}! 👋</h1>
             <p className="text-white/90">Hôm nay là ngày tuyệt vời để học tiếng Hoa</p>
           </div>
           <div className="flex items-center gap-3">
@@ -91,7 +118,6 @@ export function Overview() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-6">
@@ -126,7 +152,7 @@ export function Overview() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Streak</p>
-                <p className="text-3xl font-bold text-foreground">7 ngày</p>
+                <p className="text-3xl font-bold text-foreground">{profile?.streak || 0} ngày</p>
               </div>
               <div className="bg-purple-100 p-3 rounded-xl">
                 <Flame className="h-6 w-6 text-purple-600" />
@@ -139,8 +165,8 @@ export function Overview() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Giờ học</p>
-                <p className="text-3xl font-bold text-foreground">24h</p>
+                <p className="text-sm text-muted-foreground mb-1">Level</p>
+                <p className="text-3xl font-bold text-foreground">{profile?.level || 1}</p>
               </div>
               <div className="bg-yellow-100 p-3 rounded-xl">
                 <Clock className="h-6 w-6 text-yellow-600" />
@@ -150,9 +176,7 @@ export function Overview() {
         </Card>
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Learning Activity Chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -192,7 +216,6 @@ export function Overview() {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -227,7 +250,7 @@ export function Overview() {
                   <Zap className="h-5 w-5 text-[var(--theme-primary)]" />
                   <div>
                     <div className="font-semibold text-foreground">Nhiệm vụ</div>
-                    <div className="text-sm text-muted-foreground">3 nhiệm vụ mới</div>
+                    <div className="text-sm text-muted-foreground">Xem nhiệm vụ</div>
                   </div>
                 </button>
               </Link>
@@ -237,7 +260,7 @@ export function Overview() {
                   <Award className="h-5 w-5 text-[var(--theme-primary)]" />
                   <div>
                     <div className="font-semibold text-foreground">Chứng chỉ</div>
-                    <div className="text-sm text-muted-foreground">5 chứng chỉ</div>
+                    <div className="text-sm text-muted-foreground">Xem chứng chỉ</div>
                   </div>
                 </button>
               </Link>
@@ -257,7 +280,6 @@ export function Overview() {
         </Card>
       </div>
 
-      {/* Continue Learning */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -266,39 +288,55 @@ export function Overview() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {enrolledCourses.slice(0, 3).map((course) => {
-              const progress = user.progress[course.id] || 0;
-              
-              return (
-                <Link key={course.id} to={`/courses/${course.slug}`}>
-                  <div className="group relative overflow-hidden rounded-xl border border-border hover:shadow-lg transition-all">
-                    <img
-                      src={course.thumbnail}
-                      alt={course.titleVi}
-                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h4 className="font-bold text-white mb-2 line-clamp-1">
-                        {course.titleVi}
-                      </h4>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="bg-white/20 text-white">
-                          {progress}% hoàn thành
-                        </Badge>
-                        <Play className="h-5 w-5 text-white" />
+          {enrolledCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {enrolledCourses.slice(0, 3).map((course) => {
+                const enrollment = enrollments.find(e => e.course_id === course.id);
+                const progress = enrollment?.progress || 0;
+                
+                return (
+                  <Link key={course.id} to={`/courses/${course.slug}`}>
+                    <div className="group relative overflow-hidden rounded-xl border border-border hover:shadow-lg transition-all">
+                      {course.thumbnail_url ? (
+                        <img
+                          src={course.thumbnail_url}
+                          alt={course.title}
+                          className="w-full h-40 object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-40 bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] flex items-center justify-center">
+                          <BookOpen className="h-10 w-10 text-white/50" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h4 className="font-bold text-white mb-2 line-clamp-1">
+                          {course.title}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary" className="bg-white/20 text-white">
+                            {progress}% hoàn thành
+                          </Badge>
+                          <Play className="h-5 w-5 text-white" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground mb-4">Bạn chưa đăng ký khóa học nào</p>
+              <Link to="/courses">
+                <Button>Khám phá khóa học</Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Modals */}
       {showRecommendations && (
         <RecommendationsPanel onClose={() => setShowRecommendations(false)} />
       )}
@@ -319,13 +357,12 @@ export function Overview() {
               <AdvancedSearch
                 onSearch={handleSearch}
                 filterOptions={{
-                  categories: ['HSK 1', 'HSK 2', 'HSK 3', 'Giao tiếp', 'Du lịch', 'Thương mại'],
-                  levels: ['Cơ bản', 'Trung cấp', 'Nâng cao'],
-                  tags: ['HSK 1', 'HSK 2', 'HSK 3', 'Giao tiếp', 'Du lịch', 'Thương mại', 'Phát âm', 'Kinh doanh', 'Cơ bản', 'Trung cấp', 'Nâng cao']
+                  categories: ['HSK', 'Giao tiếp', 'Du lịch', 'Thương mại'],
+                  levels: ['beginner', 'intermediate', 'advanced'],
+                  tags: ['HSK', 'Giao tiếp', 'Phát âm', 'Kinh doanh']
                 }}
               />
 
-              {/* Search Results */}
               {searchResults.length > 0 && (
                 <div className="mt-6">
                   <div className="flex items-center justify-between mb-4">
@@ -336,8 +373,8 @@ export function Overview() {
                   </div>
                   
                   <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {searchResults.map((result, idx) => {
-                      const course = result.item;
+                    {searchResults.map((result: unknown, idx: number) => {
+                      const course = (result as { item: { id: string; title: string; slug: string; thumbnail_url: string | null; description: string | null; level: string; duration_hours: number | null; rating: number } }).item;
                       return (
                         <Link 
                           key={idx} 
@@ -347,14 +384,20 @@ export function Overview() {
                           <Card className="hover:shadow-lg transition-all cursor-pointer">
                             <CardContent className="p-4">
                               <div className="flex gap-4">
-                                <img
-                                  src={course.thumbnail}
-                                  alt={course.titleVi}
-                                  className="w-24 h-24 object-cover rounded-lg"
-                                />
+                                {course.thumbnail_url ? (
+                                  <img
+                                    src={course.thumbnail_url}
+                                    alt={course.title}
+                                    className="w-24 h-24 object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="w-24 h-24 bg-muted rounded-lg flex items-center justify-center">
+                                    <BookOpen className="h-8 w-8 text-muted-foreground" />
+                                  </div>
+                                )}
                                 <div className="flex-1">
                                   <h4 className="font-bold text-foreground mb-1">
-                                    {course.titleVi}
+                                    {course.title}
                                   </h4>
                                   <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                                     {course.description}
@@ -363,18 +406,11 @@ export function Overview() {
                                     <Badge variant="secondary">{course.level}</Badge>
                                     <span className="text-sm text-muted-foreground flex items-center gap-1">
                                       <Clock className="h-3 w-3" />
-                                      {course.duration}
+                                      {course.duration_hours ? `${course.duration_hours}h` : 'N/A'}
                                     </span>
-                                    {course.rating && (
-                                      <span className="text-sm text-muted-foreground">
-                                        ⭐ {course.rating}
-                                      </span>
-                                    )}
-                                    {result.score > 0 && (
-                                      <Badge className="bg-green-100 text-green-700">
-                                        {Math.round(result.score * 10)}% match
-                                      </Badge>
-                                    )}
+                                    <span className="text-sm text-muted-foreground">
+                                      ⭐ {course.rating}
+                                    </span>
                                   </div>
                                 </div>
                               </div>

@@ -11,7 +11,12 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck
+  ShieldCheck,
+  GraduationCap,
+  Image,
+  Bell,
+  Award,
+  CheckCircle
 } from 'lucide-react';
 import { adminAuthUtils } from '../../utils/adminAuth';
 
@@ -35,9 +40,14 @@ export function AdminLayout() {
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Quản lý khóa học', href: '/admin/courses', icon: BookOpen },
-    { name: 'Quản lý học viên', href: '/admin/students', icon: Users },
+    { name: 'Duyệt khóa học', href: '/admin/course-approval', icon: CheckCircle },
+    { name: 'Quản lý giảng viên', href: '/admin/instructors', icon: GraduationCap },
+    { name: 'Quản lý người dùng', href: '/admin/users', icon: Users },
     { name: 'Thanh toán & Đơn hàng', href: '/admin/orders', icon: CreditCard },
     { name: 'Mã giảm giá', href: '/admin/coupons', icon: Tag },
+    { name: 'Banner', href: '/admin/banners', icon: Image },
+    { name: 'Thông báo', href: '/admin/notifications', icon: Bell },
+    { name: 'Chứng chỉ', href: '/admin/certificates', icon: Award },
     { name: 'Báo cáo Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Cài đặt', href: '/admin/settings', icon: Settings },
   ];

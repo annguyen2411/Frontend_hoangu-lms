@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
@@ -6,6 +6,7 @@ import { PageLoader } from './components/PageLoader';
 
 const Courses = lazy(() => import('./pages/Courses').then(m => ({ default: m.Courses })));
 const CourseDetail = lazy(() => import('./pages/CourseDetail').then(m => ({ default: m.CourseDetail })));
+const Learn = lazy(() => import('./pages/Learn').then(m => ({ default: m.Learn })));
 const Auth = lazy(() => import('./pages/Auth').then(m => ({ default: m.Auth })));
 const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
@@ -22,6 +23,16 @@ const Certificates = lazy(() => import('./pages/Certificates').then(m => ({ defa
 const Gamification = lazy(() => import('./pages/Gamification').then(m => ({ default: m.Gamification })));
 const Quests = lazy(() => import('./pages/Quests').then(m => ({ default: m.Quests })));
 const Shop = lazy(() => import('./pages/Shop').then(m => ({ default: m.Shop })));
+const Leaderboard = lazy(() => import('./pages/Leaderboard').then(m => ({ default: m.Leaderboard })));
+const Achievements = lazy(() => import('./pages/Achievements').then(m => ({ default: m.Achievements })));
+const StudyGroups = lazy(() => import('./pages/StudyGroups').then(m => ({ default: m.StudyGroups })));
+const Friends = lazy(() => import('./pages/Friends').then(m => ({ default: m.Friends })));
+const InstructorDashboard = lazy(() => import('./pages/InstructorDashboard').then(m => ({ default: m.InstructorDashboard })));
+const Practice = lazy(() => import('./pages/Practice').then(m => ({ default: m.Practice })));
+const VoicePractice = lazy(() => import('./pages/VoicePractice').then(m => ({ default: m.VoicePractice })));
+const Recommendations = lazy(() => import('./pages/Recommendations').then(m => ({ default: m.Recommendations })));
+const LearningHistory = lazy(() => import('./pages/LearningHistory').then(m => ({ default: m.LearningHistory })));
+const Goals = lazy(() => import('./pages/Goals').then(m => ({ default: m.Goals })));
 
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin').then(m => ({ default: m.AdminLogin })));
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
@@ -32,11 +43,25 @@ const AdminOrders = lazy(() => import('./pages/admin/AdminOrders').then(m => ({ 
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons').then(m => ({ default: m.AdminCoupons })));
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings').then(m => ({ default: m.AdminSettings })));
+const AdminInstructors = lazy(() => import('./pages/admin/AdminInstructors').then(m => ({ default: m.AdminInstructors })));
+const AdminCourseApproval = lazy(() => import('./pages/admin/AdminCourseApproval').then(m => ({ default: m.AdminCourseApproval })));
+const AdminBanners = lazy(() => import('./pages/admin/AdminBanners').then(m => ({ default: m.AdminBanners })));
+const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications').then(m => ({ default: m.AdminNotifications })));
+const AdminCertificates = lazy(() => import('./pages/admin/AdminCertificates').then(m => ({ default: m.AdminCertificates })));
 
 const Checkout = lazy(() => import('./pages/payment/Checkout').then(m => ({ default: m.default })));
 
 function Page({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
+
+// Redirect components
+function AuthRedirect() {
+  return <Navigate to="/?mode=login" replace />;
+}
+
+function RegisterRedirect() {
+  return <Navigate to="/?mode=register" replace />;
 }
 
 export const router = createBrowserRouter([
@@ -66,6 +91,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'courses/:slug/learn',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Learn />
+          </Suspense>
+        ),
+      },
+      {
         path: 'contact',
         element: (
           <Suspense fallback={<PageLoader />}>
@@ -83,6 +116,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  // Auth routes - redirect to home with modal
   {
     path: 'auth',
     element: (
@@ -93,20 +127,13 @@ export const router = createBrowserRouter([
   },
   {
     path: 'login',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Auth />
-      </Suspense>
-    ),
+    element: <AuthRedirect />,
   },
   {
     path: 'register',
-    element: (
-      <Suspense fallback={<PageLoader />}>
-        <Auth />
-      </Suspense>
-    ),
+    element: <RegisterRedirect />,
   },
+  // Checkout
   {
     path: 'checkout/:courseId',
     element: (
@@ -152,6 +179,46 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Shop />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'leaderboard',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Leaderboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'achievements',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Achievements />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'study-groups',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <StudyGroups />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'friends',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Friends />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'instructor',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
           </Suspense>
         ),
       },
@@ -211,6 +278,46 @@ export const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      {
+        path: 'practice',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Practice />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'voice-practice',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <VoicePractice />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'recommendations',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Recommendations />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'history',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <LearningHistory />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'goals',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Goals />
+          </Suspense>
+        ),
+      },
     ],
   },
   // Admin routes
@@ -249,7 +356,7 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: 'students',
+            path: 'users',
             element: (
               <Suspense fallback={<PageLoader />}>
                 <AdminStudents />
@@ -277,6 +384,46 @@ export const router = createBrowserRouter([
             element: (
               <Suspense fallback={<PageLoader />}>
                 <AdminAnalytics />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'instructors',
+            element: (
+              <Suspense fallback={<PageLoader />}>
+                <AdminInstructors />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'course-approval',
+            element: (
+              <Suspense fallback={<PageLoader />}>
+                <AdminCourseApproval />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'banners',
+            element: (
+              <Suspense fallback={<PageLoader />}>
+                <AdminBanners />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'notifications',
+            element: (
+              <Suspense fallback={<PageLoader />}>
+                <AdminNotifications />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'certificates',
+            element: (
+              <Suspense fallback={<PageLoader />}>
+                <AdminCertificates />
               </Suspense>
             ),
           },

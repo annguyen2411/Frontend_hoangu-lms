@@ -1,37 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import { Award, Download, Share2, Eye, CheckCircle } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { certificateGenerator, Certificate } from '../utils/certificateGenerator';
 import { dataExport } from '../utils/dataExport';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { LoginPrompt, LoadingSpinner } from '../components/LoginPrompt';
 
 export function Certificates() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [selectedCert, setSelectedCert] = useState<Certificate | null>(null);
-  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-
-    // Only initialize once
-    if (initialized) return;
-    setInitialized(true);
-
-    // Load existing certificates
     const existing = certificateGenerator.getAll();
     
     // Create demo certificates if none exist
-    if (existing.length === 0) {
-      // Demo certificate 1
+    if (existing.length === 0 && user) {
       certificateGenerator.generate({
         courseName: 'Tiếng Hoa Sơ Cấp - HSK 1',
         studentName: user.name || 'Học viên',
@@ -42,26 +30,14 @@ export function Certificates() {
         skills: ['Nghe', 'Nói', 'Đọc', 'Viết cơ bản', '150 từ vựng'],
         duration: '3 tháng',
       });
-
-      // Demo certificate 2
-      certificateGenerator.generate({
-        courseName: 'Giao tiếp Tiếng Hoa - Cơ bản',
-        studentName: user.name || 'Học viên',
-        completionDate: new Date('2024-02-20'),
-        score: 88,
-        level: 'Beginner',
-        instructorName: 'Giáo viên Trần Hoa',
-        skills: ['Giao tiếp hàng ngày', 'Phát âm chuẩn', 'Ngữ pháp cơ bản'],
-        duration: '2 tháng',
-      });
-      
-      // Reload after creating
-      setCertificates(certificateGenerator.getAll());
-    } else {
-      setCertificates(existing);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    
+    setCertificates(certificateGenerator.getAll());
+    setLoading(false);
+  }, [user]);
+
+  if (loading || isLoading) return <LoadingSpinner />;
+  if (!user) return <LoginPrompt />;
 
   const loadCertificates = () => {
     setCertificates(certificateGenerator.getAll());
@@ -90,8 +66,6 @@ export function Certificates() {
     dataExport.downloadJSON(data, `HoaNgu-Certificates-${new Date().toISOString().split('T')[0]}`);
     toast.success('Đã xuất dữ liệu chứng chỉ!');
   };
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">

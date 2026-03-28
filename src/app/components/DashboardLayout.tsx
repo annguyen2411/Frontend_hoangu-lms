@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, Navigate } from 'react-router';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -12,13 +12,31 @@ import {
   Sparkles,
   CreditCard,
   Menu,
-  X
+  X,
+  Trophy,
+  GraduationCap,
+  UserPlus
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { LoginPrompt } from './LoginPrompt';
 
 export function DashboardLayout() {
   const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPrompt />;
+  }
 
   const navigation = [
     { name: 'Tổng quan', href: '/dashboard', icon: LayoutDashboard, exact: true },
@@ -26,9 +44,13 @@ export function DashboardLayout() {
     { name: 'Lịch học', href: '/schedule', icon: Calendar },
     { name: 'Phân tích', href: '/analytics', icon: BarChart3 },
     { name: 'Cộng đồng', href: '/community', icon: Users },
+    { name: 'Nhóm học tập', href: '/study-groups', icon: Users },
+    { name: 'Bạn bè', href: '/friends', icon: UserPlus },
     { name: 'Chứng chỉ', href: '/certificates', icon: Award },
     { name: 'Flashcards', href: '/flashcards', icon: Sparkles },
     { name: 'Nhiệm vụ', href: '/quests', icon: Zap },
+    { name: 'Thành tựu', href: '/achievements', icon: Trophy },
+    { name: 'Xếp hạng', href: '/leaderboard', icon: Trophy },
     { name: 'Cửa hàng', href: '/shop', icon: ShoppingBag },
     { name: 'Gamification', href: '/gamification', icon: CreditCard },
     { name: 'Cài đặt', href: '/settings', icon: Settings },

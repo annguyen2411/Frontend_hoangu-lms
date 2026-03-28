@@ -1,13 +1,16 @@
 import { TrendingUp, Users, BookOpen, ShoppingCart, DollarSign, Award } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { dashboardStats, analyticsData, orders } from '../../data/adminData';
+import { useAdminStats, useAdminOrders } from '../../hooks/useAdmin';
 
 export function AdminDashboard() {
-  const stats = [
+  const { stats, loading: statsLoading } = useAdminStats();
+  const { orders, loading: ordersLoading } = useAdminOrders();
+
+  const statsData = [
     {
       id: 'revenue',
       name: 'Doanh thu tháng này',
-      value: `${(dashboardStats.monthlyRevenue / 1000000).toFixed(1)}M`,
+      value: `${(stats.totalRevenue / 1000000).toFixed(1)}M`,
       change: '+12.5%',
       changeType: 'positive',
       icon: DollarSign,
@@ -16,7 +19,7 @@ export function AdminDashboard() {
     {
       id: 'students',
       name: 'Học viên mới',
-      value: dashboardStats.newStudents,
+      value: stats.totalStudents,
       change: '+23.4%',
       changeType: 'positive',
       icon: Users,
@@ -25,7 +28,7 @@ export function AdminDashboard() {
     {
       id: 'completion',
       name: 'Tỷ lệ hoàn thành',
-      value: `${dashboardStats.completionRate}%`,
+      value: `${Math.round((stats.totalEnrollments / Math.max(stats.totalStudents, 1)) * 100)}%`,
       change: '+5.2%',
       changeType: 'positive',
       icon: Award,
@@ -34,7 +37,7 @@ export function AdminDashboard() {
     {
       id: 'orders',
       name: 'Đơn hàng',
-      value: dashboardStats.activeOrders,
+      value: orders.filter(o => o.status === 'pending').length,
       change: '+8.1%',
       changeType: 'positive',
       icon: ShoppingCart,
@@ -43,6 +46,24 @@ export function AdminDashboard() {
   ];
 
   const recentOrders = orders.slice(0, 5);
+
+  const analyticsData = [
+    { day: 'T2', revenue: 1200000, students: 12, orders: 8 },
+    { day: 'T3', revenue: 1800000, students: 15, orders: 12 },
+    { day: 'T4', revenue: 900000, students: 8, orders: 5 },
+    { day: 'T5', revenue: 2100000, students: 18, orders: 14 },
+    { day: 'T6', revenue: 1500000, students: 14, orders: 10 },
+    { day: 'T7', revenue: 2400000, students: 20, orders: 16 },
+    { day: 'CN', revenue: 1800000, students: 16, orders: 11 },
+  ];
+
+  if (statsLoading || ordersLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -53,7 +74,7 @@ export function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => {
+        {statsData.map((stat) => {
           const Icon = stat.icon;
           return (
             <div key={stat.id} className="bg-white rounded-xl shadow-md p-6">
@@ -177,17 +198,17 @@ export function AdminDashboard() {
               {recentOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-semibold text-gray-900">{order.orderId}</span>
+                    <span className="font-semibold text-gray-900">{order.id.slice(0, 8)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-gray-900">{order.studentName}</span>
+                    <span className="text-gray-900">{order.user_id.slice(0, 8)}...</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-gray-900">{order.courseName}</span>
+                    <span className="text-gray-900">{order.course_id ? order.course_id.slice(0, 8) + '...' : 'N/A'}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="font-semibold text-gray-900">
-                      {order.amount.toLocaleString()}đ
+                      {(order.amount_vnd || 0).toLocaleString()}đ
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -208,7 +229,7 @@ export function AdminDashboard() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                    {new Date(order.date).toLocaleDateString('vi-VN')}
+                    {new Date(order.created_at).toLocaleDateString('vi-VN')}
                   </td>
                 </tr>
               ))}

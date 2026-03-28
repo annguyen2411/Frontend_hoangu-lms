@@ -1,20 +1,42 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { BookOpen, Clock, Play, Award, TrendingUp, ChevronRight, CheckCircle, Lock, Flame } from 'lucide-react';
-import { authUtils } from '../../utils/auth';
-import { courses } from '../../data/mockData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCourses, useEnrollments } from '../../hooks/useData';
 import { Button } from '../../components/ui/Button';
 import { Progress } from '../../components/ui/Progress';
 import { motion } from 'motion/react';
+import { COURSE_LEVEL_LABELS } from '../../constants/enums';
+import { LoginPrompt } from '../../components/LoginPrompt';
 
 export function MyCourses() {
-  const user = authUtils.getCurrentUser();
-  if (!user) return null;
+  const { profile, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { courses, loading: coursesLoading } = useCourses({ publishedOnly: true });
+  const { enrollments, loading: enrollmentsLoading } = useEnrollments(profile?.id);
 
-  const enrolledCourses = courses.filter(c => user.enrolledCourses.includes(c.id));
-  
-  const totalProgress = Math.round(
-    Object.values(user.progress).reduce((a, b) => a + b, 0) / (user.enrolledCourses.length || 1)
+  // Get enrolled courses by matching enrollments with courses
+  const enrolledCourses = courses.filter(course => 
+    enrollments.some(e => e.course_id === course.id)
   );
+
+  const totalProgress = enrollments.length > 0
+    ? Math.round(enrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / enrollments.length)
+    : 0;
+
+  if (authLoading || enrollmentsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-8 bg-[var(--primary)] rounded-full animate-bounce"></div>
+          <p className="mt-4 text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPrompt />;
+  }
 
   const stats = [
     {
@@ -31,21 +53,36 @@ export function MyCourses() {
     },
     {
       icon: Flame,
-      label: 'Học tuần này',
-      value: '8.5h',
+      label: 'Streak',
+      value: `${profile?.streak || 0} ngày`,
       color: 'bg-orange-100 text-orange-600',
     },
     {
       icon: Award,
-      label: 'Chứng chỉ',
-      value: '2',
+      label: 'Level',
+      value: profile?.level || 1,
       color: 'bg-yellow-100 text-yellow-600',
     },
   ];
 
+  const getLevelLabel = (level: string) => {
+    return COURSE_LEVEL_LABELS[level as keyof typeof COURSE_LEVEL_LABELS] || level;
+  };
+
+  // Wait for courses to load
+  if (coursesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-8 bg-[var(--primary)] rounded-full animate-bounce"></div>
+          <p className="mt-4 text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-12">
-      {/* Header */}
       <div className="bg-gradient-to-r from-[var(--primary)] to-red-700 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -69,7 +106,6 @@ export function MyCourses() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {stats.map((stat, index) => (
@@ -94,15 +130,14 @@ export function MyCourses() {
         </div>
       </div>
 
-      {/* Courses List */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Đang học</h2>
         
         {enrolledCourses.length > 0 ? (
           <div className="space-y-4">
             {enrolledCourses.map((course, index) => {
-              const progress = user.progress[course.id] || 0;
-              const lessonsCompleted = Math.round((progress / 100) * course.totalLessons);
+              const enrollment = enrollments.find(e => e.course_id === course.id);
+              const progress = enrollment?.progress || 0;
               
               return (
                 <motion.div
@@ -113,15 +148,20 @@ export function MyCourses() {
                 >
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all group">
                     <div className="flex flex-col md:flex-row">
-                      {/* Thumbnail */}
                       <div className="relative md:w-72 flex-shrink-0">
-                        <img
-                          src={course.thumbnail}
-                          alt={course.titleVi}
-                          className="w-full h-48 md:h-full object-cover"
-                        />
+                        {course.thumbnail_url ? (
+                          <img
+                            src={course.thumbnail_url}
+                            alt={course.title}
+                            className="w-full h-48 md:h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-48 md:h-full bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] flex items-center justify-center">
+                            <BookOpen className="h-12 w-12 text-white/50" />
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent md:bg-none md:hidden" />
-                        {progress === 100 && (
+                        {progress >= 100 && (
                           <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                             <CheckCircle className="h-3 w-3" />
                             Hoàn thành
@@ -129,41 +169,29 @@ export function MyCourses() {
                         )}
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 p-6">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                           <div className="flex-1">
-                            {/* Level Badge */}
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold text-white mb-3 ${
-                              course.hskLevel === 1 ? 'bg-green-500' :
-                              course.hskLevel === 2 ? 'bg-blue-500' :
-                              course.hskLevel === 3 ? 'bg-purple-500' :
+                              course.level === 'beginner' ? 'bg-green-500' :
+                              course.level === 'intermediate' ? 'bg-blue-500' :
+                              course.level === 'advanced' ? 'bg-purple-500' :
                               'bg-orange-500'
                             }`}>
-                              HSK {course.hskLevel} - {course.level}
+                              {course.category} - {getLevelLabel(course.level)}
                             </span>
 
-                            {/* Title */}
                             <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-[var(--primary)] transition-colors">
-                              {course.titleVi}
+                              {course.title}
                             </h3>
 
-                            {/* Teacher */}
                             <div className="flex items-center gap-2 mb-4">
-                              <img
-                                src={course.teacher.avatar}
-                                alt={course.teacher.nameVi}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                              <span className="text-gray-600">{course.teacher.nameVi}</span>
-                              {course.teacher.isNative && (
-                                <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
-                                  Bản xứ
-                                </span>
-                              )}
+                              <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-sm font-bold">
+                                {course.teacher_name?.[0] || 'G'}
+                              </div>
+                              <span className="text-gray-600">{course.teacher_name || 'Giảng viên HoaNgữ'}</span>
                             </div>
 
-                            {/* Progress */}
                             <div className="mb-4">
                               <div className="flex items-center justify-between text-sm mb-2">
                                 <span className="text-gray-500">Tiến độ</span>
@@ -179,38 +207,25 @@ export function MyCourses() {
                               </div>
                             </div>
 
-                            {/* Meta */}
                             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                               <div className="flex items-center gap-1">
                                 <BookOpen className="h-4 w-4" />
-                                <span>{course.totalLessons} bài học</span>
+                                <span>{course.total_lessons} bài học</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-4 w-4" />
-                                <span>{course.duration}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                <span>{lessonsCompleted}/{course.totalLessons} hoàn thành</span>
+                                <span>{course.duration_hours ? `${course.duration_hours}h` : 'N/A'}</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Actions */}
                           <div className="flex md:flex-col gap-3 md:items-end">
                             <Link to={`/courses/${course.slug}`} className="flex-1 md:flex-none">
                               <Button className="w-full bg-gradient-to-r from-[var(--primary)] to-red-600 hover:opacity-90 text-white font-semibold shadow-lg group-hover:shadow-xl transition-all">
                                 <Play className="h-5 w-5 mr-2" />
-                                {progress === 0 ? 'Bắt đầu' : progress === 100 ? 'Ôn tập' : 'Tiếp tục'}
+                                {progress === 0 ? 'Bắt đầu' : progress >= 100 ? 'Ôn tập' : 'Tiếp tục'}
                               </Button>
                             </Link>
-                            {progress > 0 && progress < 100 && (
-                              <Link to={`/courses/${course.slug}/lesson/${Math.ceil((progress / 100) * course.totalLessons)}`}>
-                                <Button variant="outline" className="border-gray-300 hover:border-[var(--primary)] hover:text-[var(--primary)]">
-                                  <ChevronRight className="h-4 w-4" />
-                                </Button>
-                              </Link>
-                            )}
                           </div>
                         </div>
                       </div>

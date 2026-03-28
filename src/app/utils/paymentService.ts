@@ -1,100 +1,151 @@
-import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
 
 export interface PaymentRecord {
   id: string;
   user_id: string;
-  course_id: string;
+  course_id: string | null;
   amount_vnd: number;
   payment_method: string;
-  status: string;
-  transaction_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  transaction_id: string | null;
+  note: string | null;
   created_at: string;
+  completed_at: string | null;
 }
 
-export const BANK_INFO = {
-  bankName: 'Vietcombank',
-  accountNumber: '1234567890',
-  accountName: 'CONG TY HOA NGU',
-  branch: 'Chi nhánh TP.HCM',
-  qrCode: '',
-};
-
-export const MOMO_INFO = {
-  phoneNumber: '0123456789',
-  accountName: 'CONG TY HOA NGU',
-};
-
-export async function createPayment(
-  courseId: string,
-  amountVnd: number,
-  paymentMethod: 'bank_transfer' | 'momo'
-): Promise<PaymentRecord> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) throw new Error('Vui lòng đăng nhập để thanh toán');
-
-  const transactionId = `HN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-  const { data, error } = await supabase
-    .from('payments')
-    .insert({
-      user_id: user.id,
-      course_id: courseId,
-      amount_vnd: amountVnd,
-      payment_method: paymentMethod,
-      status: 'pending',
-      transaction_id: transactionId,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export interface CreatePaymentParams {
+  courseId: string;
+  amountVnd: number;
+  paymentMethod: 'bank_transfer' | 'momo';
 }
 
-export async function getPaymentStatus(paymentId: string): Promise<PaymentRecord> {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('id', paymentId)
-    .single();
-
-  if (error) throw error;
-  return data;
+export interface PaymentConfig {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  branch: string;
+  qrCode?: string;
 }
 
-export async function verifyPayment(
-  transactionId: string,
-  status: 'completed' | 'failed'
-): Promise<void> {
-  const { error } = await supabase
-    .from('payments')
-    .update({
-      status,
-      completed_at: status === 'completed' ? new Date().toISOString() : null,
-    })
-    .eq('transaction_id', transactionId);
+export interface MoMoConfig {
+  phoneNumber: string;
+  accountName: string;
+}
 
-  if (error) throw error;
-
-  if (status === 'completed') {
-    const { data: payment } = await supabase
-      .from('payments')
-      .select('user_id, course_id')
-      .eq('transaction_id', transactionId)
-      .single();
-
-    if (payment) {
-      await supabase.from('enrollments').insert({
-        user_id: payment.user_id,
-        course_id: payment.course_id,
-        status: 'active',
-      });
-
-      await supabase
-        .from('courses')
-        .update({ students_enrolled: supabase.raw('students_enrolled + 1') })
-        .eq('id', payment.course_id);
+async function getPaymentConfigFromDb(): Promise<PaymentConfig | null> {
+  try {
+    const response = await api.settings.getAll();
+    if (!response.success || !response.data) {
+      return null;
     }
+
+    const settings = response.data;
+    const configMap = new Map(settings.map((s: any) => [s.key, s.value]));
+    
+    const bankName = configMap.get('bank_name');
+    const accountNumber = configMap.get('account_number');
+    const accountName = configMap.get('account_name');
+    const branch = configMap.get('bank_branch');
+
+    if (!bankName || !accountNumber || !accountName) {
+      return null;
+    }
+
+    return {
+      bankName,
+      accountNumber,
+      accountName,
+      branch: branch || '',
+      qrCode: '',
+    };
+  } catch (error) {
+    console.error('Error fetching payment config:', error);
+    return null;
+  }
+}
+
+export async function getBankInfo(): Promise<PaymentConfig> {
+  const dbConfig = await getPaymentConfigFromDb();
+  if (dbConfig) {
+    return dbConfig;
+  }
+  
+  throw new Error('Thông tin thanh toán chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+}
+
+export async function getMoMoInfo(): Promise<MoMoConfig> {
+  try {
+    const response = await api.settings.get('momo_phone');
+    if (!response.success || !response.data) {
+      throw new Error('Thông tin MoMo chưa được cấu hình');
+    }
+
+    return {
+      phoneNumber: response.data.value || '',
+      accountName: 'HoaNgữ LMS',
+    };
+  } catch (error) {
+    throw new Error('Thông tin MoMo chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+  }
+}
+
+export async function createPayment(params: CreatePaymentParams): Promise<PaymentRecord> {
+  const response = await api.payments.create({
+    course_id: params.courseId,
+    amount_vnd: params.amountVnd,
+    payment_method: params.paymentMethod,
+  });
+
+  if (!response.success) {
+    throw new Error(response.error || 'Tạo thanh toán thất bại');
+  }
+
+  return response.data as PaymentRecord;
+}
+
+export async function completePayment(paymentId: string, transactionId: string): Promise<void> {
+  const response = await api.payments.complete(paymentId, transactionId);
+
+  if (!response.success) {
+    throw new Error(response.error || 'Xác nhận thanh toán thất bại');
+  }
+}
+
+export async function getPaymentHistory(): Promise<PaymentRecord[]> {
+  const response = await api.payments.getAll();
+
+  if (!response.success) {
+    throw new Error(response.error || 'Lỗi khi lấy lịch sử thanh toán');
+  }
+
+  return response.data as PaymentRecord[];
+}
+
+export async function getPaymentStatus(paymentId: string): Promise<string> {
+  const response = await api.payments.getAll();
+  
+  if (!response.success || !response.data) {
+    return 'unknown';
+  }
+
+  const payment = response.data.find((p: any) => p.id === paymentId);
+  return payment?.status || 'unknown';
+}
+
+export async function checkEnrollment(courseId: string): Promise<boolean> {
+  const response = await api.enrollments.check(courseId);
+  
+  if (!response.success) {
+    return false;
+  }
+
+  return response.data?.enrolled || false;
+}
+
+export async function enrollCourse(courseId: string): Promise<void> {
+  const response = await api.enrollments.create(courseId);
+
+  if (!response.success) {
+    throw new Error(response.error || 'Đăng ký khóa học thất bại');
   }
 }

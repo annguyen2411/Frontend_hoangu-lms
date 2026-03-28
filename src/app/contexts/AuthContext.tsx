@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../../lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import { api } from '../../lib/api';
 
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
-  avatar_url: string;
+  avatar_url: string | null;
   role: string;
   level: number;
   xp: number;
@@ -22,56 +21,71 @@ export interface UserProfile {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   profile: UserProfile | null;
-  session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ error: Error | null }>;
+  register: (name: string, email: string, password: string) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
-  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
+  showError: (message: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+  const showError = (message: string) => {
+    setGlobalError(message);
+    setTimeout(() => setGlobalError(null), 5000);
+  };
+
+  const fetchProfile = async (): Promise<UserProfile | null> => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
+      const response = await api.auth.getMe();
+      if (response.success && response.data) {
+        return response.data as UserProfile;
       }
-      return data as UserProfile;
+      return null;
     } catch (error) {
       console.error('Error fetching profile:', error);
       return null;
     }
   };
 
+  const createDefaultProfile = (email: string): UserProfile => ({
+    id: '',
+    email,
+    full_name: 'Học viên',
+    avatar_url: null,
+    role: 'student',
+    level: 1,
+    xp: 0,
+    total_xp: 0,
+    xp_to_next_level: 100,
+    coins: 50,
+    streak: 0,
+    completed_quests: 0,
+    language: 'vi',
+    theme: 'light',
+    notification_enabled: true,
+    created_at: new Date().toISOString(),
+  });
+
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          setSession(session);
-          setUser(session.user);
-          
-          const userProfile = await fetchProfile(session.user.id);
-          setProfile(userProfile);
+        const token = api.getToken();
+        if (token) {
+          const userProfile = await fetchProfile();
+          if (userProfile) {
+            setUser(userProfile);
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -81,107 +95,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        const userProfile = await fetchProfile(session.user.id);
-        setProfile(userProfile);
-      } else {
-        setProfile(null);
-      }
-      
-      setIsLoading(false);
-    });
-
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-    };
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  const login = async (email: string, password: string): Promise<{ error: Error | null }> => {
+    try {
+      setIsLoading(true);
+      const response = await api.auth.login(email, password);
 
-    if (error) throw error;
-    
-    if (data.user) {
-      const userProfile = await fetchProfile(data.user.id);
-      setProfile(userProfile);
+      if (!response.success) {
+        return { error: new Error(response.error || 'Đăng nhập thất bại') };
+      }
+
+      if (response.data) {
+        api.setToken(response.data.token);
+        setUser(response.data.user);
+        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<void> => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-        },
-      },
-    });
+  const register = async (name: string, email: string, password: string): Promise<{ error: Error | null }> => {
+    try {
+      setIsLoading(true);
+      const response = await api.auth.register(email, password, name);
 
-    if (error) throw error;
-
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: data.user.id,
-          email: email,
-          full_name: name,
-          role: 'student',
-          level: 1,
-          xp: 0,
-          total_xp: 0,
-          xp_to_next_level: 100,
-          coins: 50,
-          streak: 0,
-          completed_quests: 0,
-        });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
+      if (!response.success) {
+        return { error: new Error(response.error || 'Đăng ký thất bại') };
       }
+
+      if (response.data) {
+        api.setToken(response.data.token);
+        setUser(response.data.user);
+        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const logout = async (): Promise<void> => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setProfile(null);
+    try {
+      api.setToken(null);
+      setUser(null);
+      localStorage.removeItem('user_data');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      throw error;
+    }
   };
 
-  const updateProfile = async (updates: Partial<UserProfile>): Promise<void> => {
-    if (!user) return;
+  const updateProfile = async (updates: Partial<UserProfile>): Promise<{ error: Error | null }> => {
+    if (!user) {
+      return { error: new Error('Người dùng chưa đăng nhập') };
+    }
 
-    const { error } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('id', user.id);
+    try {
+      const response = await api.auth.updateProfile(updates);
 
-    if (error) throw error;
+      if (!response.success) {
+        return { error: new Error(response.error || 'Cập nhật thất bại') };
+      }
 
-    setProfile(prev => prev ? { ...prev, ...updates } : null);
+      if (response.data) {
+        setUser(prev => prev ? { ...prev, ...response.data } : null);
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
   };
 
   const refreshProfile = async (): Promise<void> => {
-    if (!user) return;
-    const userProfile = await fetchProfile(user.id);
-    setProfile(userProfile);
+    const userProfile = await fetchProfile();
+    if (userProfile) {
+      setUser(userProfile);
+    }
   };
 
   const value: AuthContextType = {
     user,
-    profile,
-    session,
+    profile: user,
     isLoading,
     isAuthenticated: !!user,
     login,
@@ -189,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     updateProfile,
     refreshProfile,
+    showError,
   };
 
   return (

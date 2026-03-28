@@ -1,18 +1,52 @@
-import { useState } from 'react';
-import { Calendar, TrendingUp, Users, DollarSign, ShoppingCart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, TrendingUp, Users, DollarSign, ShoppingCart, Loader2, Target, Activity } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { analyticsData } from '../../data/adminData';
+import { useAdminStats } from '../../hooks/useAdmin';
+import { api } from '../../../lib/api';
 
 export function AdminAnalytics() {
-  const [dateRange, setDateRange] = useState('7days');
+  const [dateRange, setDateRange] = useState('30');
+  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [engagement, setEngagement] = useState<any>(null);
 
-  const courseData = [
-    { id: 'hsk1', name: 'HSK 1', students: 3456, revenue: 68784000 },
-    { id: 'hsk2', name: 'HSK 2', students: 2234, revenue: 55626600 },
-    { id: 'business', name: 'Thương mại', students: 1567, revenue: 70385300 },
-    { id: 'travel', name: 'Du lịch', students: 4321, revenue: 29814900 },
-    { id: 'pronunciation', name: 'Phát âm', students: 2890, revenue: 43079000 }
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [revenueRes, topCoursesRes, engagementRes] = await Promise.all([
+          api.admin.getRevenueAnalytics(parseInt(dateRange)),
+          api.admin.getTopCourses(10),
+          api.admin.getEngagement(),
+        ]);
+        
+        if (revenueRes.success && revenueRes.data) {
+          setRevenueData(revenueRes.data.map((r: any) => ({
+            date: new Date(r.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }),
+            revenue: r.revenue || 0,
+            orders: r.orders || 0
+          })));
+        }
+
+        if (topCoursesRes.success && topCoursesRes.data) {
+          setCourses(topCoursesRes.data);
+        }
+
+        if (engagementRes.success && engagementRes.data) {
+          setEngagement(engagementRes.data);
+        }
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [dateRange]);
+
+  const totalRevenue = revenueData.reduce((sum, r) => sum + (r.revenue || 0), 0);
+  const totalOrders = revenueData.reduce((sum, r) => sum + (r.orders || 0), 0);
 
   const paymentMethods = [
     { id: 'vnpay', name: 'VNPay', value: 45, color: '#3b82f6' },
@@ -20,6 +54,17 @@ export function AdminAnalytics() {
     { id: 'zalopay', name: 'ZaloPay', value: 15, color: '#0ea5e9' },
     { id: 'visa', name: 'Visa/Mastercard', value: 10, color: '#6366f1' }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+          <span className="text-gray-500">Đang tải dữ liệu...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -35,239 +80,173 @@ export function AdminAnalytics() {
             onChange={(e) => setDateRange(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
           >
-            <option value="7days">7 ngày qua</option>
-            <option value="30days">30 ngày qua</option>
-            <option value="90days">90 ngày qua</option>
-            <option value="year">Năm nay</option>
+            <option value="7">7 ngày qua</option>
+            <option value="30">30 ngày qua</option>
+            <option value="90">90 ngày qua</option>
+            <option value="365">1 năm qua</option>
           </select>
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-md p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <DollarSign className="h-8 w-8" />
-            <span className="text-sm font-semibold">+12.5%</span>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <Activity className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">User hoạt động/ngày</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {engagement?.dailyActiveUsers || 0}
+              </p>
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">
-            {analyticsData.reduce((sum, d) => sum + d.revenue, 0).toLocaleString()}đ
-          </div>
-          <div className="text-green-100">Tổng doanh thu</div>
         </div>
-
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <Users className="h-8 w-8" />
-            <span className="text-sm font-semibold">+23.4%</span>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <Users className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">User mới tháng</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {engagement?.newUsersThisMonth || 0}
+              </p>
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">
-            {analyticsData.reduce((sum, d) => sum + d.students, 0)}
-          </div>
-          <div className="text-blue-100">Học viên mới</div>
         </div>
-
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <ShoppingCart className="h-8 w-8" />
-            <span className="text-sm font-semibold">+18.2%</span>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <DollarSign className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Doanh thu</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {(totalRevenue / 1000000).toFixed(1)}M ₫
+              </p>
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">
-            {analyticsData.reduce((sum, d) => sum + d.orders, 0)}
-          </div>
-          <div className="text-yellow-100">Đơn hàng</div>
         </div>
-
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-md p-6 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <TrendingUp className="h-8 w-8" />
-            <span className="text-sm font-semibold">+8.7%</span>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <ShoppingCart className="h-6 w-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Đơn hàng</p>
+              <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
+            </div>
           </div>
-          <div className="text-3xl font-bold mb-1">
-            {Math.round(
-              analyticsData.reduce((sum, d) => sum + d.revenue, 0) /
-                analyticsData.reduce((sum, d) => sum + d.orders, 0)
-            ).toLocaleString()}
-            đ
-          </div>
-          <div className="text-red-100">Giá trị TB/đơn</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Revenue Trend */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Xu hướng doanh thu</h2>
+      {/* Engagement Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-cyan-100 rounded-lg">
+              <Users className="h-6 w-6 text-cyan-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Học viên hoạt động tháng</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {engagement?.monthlyActiveUsers || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-yellow-100 rounded-lg">
+              <Target className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Tỷ lệ hoàn thành</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {engagement?.completionRate || 0}%
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-100 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Khóa học bán chạy</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {courses[0]?.title?.slice(0, 15) || 'N/A'}...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Revenue Chart */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Doanh thu theo ngày</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analyticsData}>
-              <CartesianGrid key="grid-analytics-line" strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                key="xaxis-analytics-line"
-                dataKey="day"
-                stroke="#9ca3af"
-              />
-              <YAxis
-                key="yaxis-analytics-line"
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                stroke="#9ca3af"
-              />
-              <Tooltip
-                key="tooltip-analytics-line"
-                formatter={(value: number) => [`${value.toLocaleString()}đ`, 'Doanh thu']}
-                labelFormatter={(label) => `Ngày ${label}/3`}
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px'
-                }}
-              />
-              <Line
-                key="line-analytics"
-                type="monotone"
-                dataKey="revenue"
-                stroke="#dc2626"
-                strokeWidth={3}
-                dot={{ fill: '#dc2626', r: 5 }}
-              />
+            <LineChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip formatter={(value: number) => `${(value / 1000).toFixed(0)}K ₫`} />
+              <Line type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2} name="Doanh thu" />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Payment Methods */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Phương thức thanh toán
-          </h2>
+        {/* Top Courses */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top khóa học bán chạy</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={paymentMethods}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name}: ${value}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {paymentMethods.map((entry) => (
-                  <Cell key={`cell-${entry.id}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => `${value}%`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Course Performance */}
-        <div className="bg-white rounded-xl shadow-md p-6 lg:col-span-2">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Hiệu suất theo khóa học
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={courseData}>
-              <CartesianGrid key="grid-course-bar" strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                key="xaxis-course-bar"
-                dataKey="id"
-                tickFormatter={(value) => {
-                  const item = courseData.find(d => d.id === value);
-                  return item ? item.name : value;
-                }}
-                stroke="#9ca3af"
-              />
-              <YAxis key="yaxis-left-course" yAxisId="left" stroke="#9ca3af" />
-              <YAxis
-                key="yaxis-right-course"
-                yAxisId="right"
-                orientation="right"
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                stroke="#9ca3af"
-              />
-              <Tooltip
-                key="tooltip-course-bar"
-                labelFormatter={(label) => {
-                  const item = courseData.find(d => d.id === label);
-                  return item ? item.name : label;
-                }}
-                formatter={(value: number, name: string) => [
-                  name === 'Học viên' ? value : `${value.toLocaleString()}đ`,
-                  name,
-                ]}
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend key="legend-course-bar" />
-              <Bar key="bar-students-course" yAxisId="left" dataKey="students" fill="#3b82f6" name="Học viên" />
-              <Bar
-                key="bar-revenue-course"
-                yAxisId="right"
-                dataKey="revenue"
-                fill="#f59e0b"
-                name="Doanh thu"
-              />
+            <BarChart data={courses.slice(0, 5)} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis dataKey="title" type="category" width={120} tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(value: number) => `${(value / 1000000).toFixed(1)}M ₫`} />
+              <Bar dataKey="total_revenue" fill="#8b5cf6" name="Doanh thu" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Top Courses Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Top khóa học bán chạy</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Khóa học
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Học viên
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Doanh thu
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Tăng trưởng
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {courseData.map((course, index) => (
-                <tr key={course.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <span className="text-2xl font-bold text-gray-300">
-                      {index + 1}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-gray-900">{course.name}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-gray-900">{course.students.toLocaleString()}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-gray-900">
-                      {course.revenue.toLocaleString()}đ
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-green-600 font-semibold">
-                      +{Math.floor(Math.random() * 30 + 10)}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Payment Methods */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Phương thức thanh toán</h3>
+        <div className="flex items-center gap-8">
+          <ResponsiveContainer width={200} height={200}>
+            <PieChart>
+              <Pie
+                data={paymentMethods}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                label
+              >
+                {paymentMethods.map((entry, index) => (
+                  <Cell key={entry.id} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-3">
+            {paymentMethods.map((method) => (
+              <div key={method.id} className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: method.color }} />
+                <span className="text-sm text-gray-600">{method.name}</span>
+                <span className="text-sm font-medium text-gray-900">{method.value}%</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

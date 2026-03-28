@@ -1,84 +1,180 @@
-// Mock authentication utility using localStorage
+import { api } from '../../lib/api';
 
-export interface User {
+export interface AuthUser {
   id: string;
   name: string;
   email: string;
   avatar: string;
   enrolledCourses: string[];
-  progress: Record<string, number>; // courseId -> percentage
+  progress: Record<string, number>;
 }
 
-const STORAGE_KEY = 'hoanguy_user';
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: any | null;
+  error: Error | null;
+}
+
+class AuthService {
+  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    try {
+      const response = await api.auth.login(credentials.email, credentials.password);
+      if (!response.success) {
+        return { user: null, error: new Error(response.error || 'Login failed') };
+      }
+      return { user: response.data?.user || null, error: null };
+    } catch (error) {
+      return { user: null, error: error as Error };
+    }
+  }
+
+  async register(data: RegisterData): Promise<AuthResponse> {
+    try {
+      const response = await api.auth.register(data.email, data.password, data.name);
+      if (!response.success) {
+        return { user: null, error: new Error(response.error || 'Registration failed') };
+      }
+      return { user: response.data?.user || null, error: null };
+    } catch (error) {
+      return { user: null, error: error as Error };
+    }
+  }
+
+  async logout(): Promise<{ error: Error | null }> {
+    try {
+      api.setToken(null);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }
+
+  async getCurrentUser(): Promise<any | null> {
+    try {
+      const response = await api.auth.getMe();
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async resetPassword(email: string): Promise<{ error: Error | null }> {
+    return { error: new Error('Not implemented') };
+  }
+
+  async updatePassword(newPassword: string): Promise<{ error: Error | null }> {
+    try {
+      const response = await api.auth.changePassword('', newPassword);
+      if (!response.success) {
+        return { error: new Error(response.error || 'Password update failed') };
+      }
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }
+
+  async updateProfile(updates: { full_name?: string; avatar_url?: string }): Promise<{ error: Error | null }> {
+    try {
+      const response = await api.auth.updateProfile(updates);
+      if (!response.success) {
+        return { error: new Error(response.error || 'Profile update failed') };
+      }
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }
+}
+
+export const authService = new AuthService();
 
 export const authUtils = {
-  // Check if user is logged in
   isAuthenticated(): boolean {
-    return localStorage.getItem(STORAGE_KEY) !== null;
+    return !!api.getToken();
   },
 
-  // Get current user
-  getCurrentUser(): User | null {
-    const userData = localStorage.getItem(STORAGE_KEY);
-    if (!userData) return null;
-    return JSON.parse(userData);
-  },
-
-  // Login (mock)
-  login(email: string, password: string): User {
-    // Mock user data
-    const user: User = {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      email: email,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
-      enrolledCourses: ['1', '2'],
-      progress: {
-        '1': 35,
-        '2': 12
+  getCurrentUser(): AuthUser | null {
+    const token = api.getToken();
+    if (!token) return null;
+    
+    // Check for user_data in localStorage (from old system)
+    const userStr = localStorage.getItem('user_data');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return {
+          id: user.id || '',
+          name: user.full_name || 'User',
+          email: user.email || '',
+          avatar: user.avatar_url || '',
+          enrolledCourses: [],
+          progress: {},
+        };
+      } catch {
+        return null;
       }
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    return user;
-  },
-
-  // Register (mock)
-  register(name: string, email: string, password: string): User {
-    const user: User = {
-      id: Date.now().toString(),
-      name: name,
-      email: email,
-      avatar: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=200`,
-      enrolledCourses: [],
-      progress: {}
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    return user;
-  },
-
-  // Logout
-  logout(): void {
-    localStorage.removeItem(STORAGE_KEY);
-  },
-
-  // Update user progress
-  updateProgress(courseId: string, percentage: number): void {
-    const user = this.getCurrentUser();
-    if (!user) return;
-    
-    user.progress[courseId] = percentage;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  },
-
-  // Enroll in course
-  enrollCourse(courseId: string): void {
-    const user = this.getCurrentUser();
-    if (!user) return;
-    
-    if (!user.enrolledCourses.includes(courseId)) {
-      user.enrolledCourses.push(courseId);
-      user.progress[courseId] = 0;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     }
+    return null;
+  },
+
+  async login(email: string, password: string): Promise<AuthUser> {
+    const response = await api.auth.login(email, password);
+    if (!response.success) {
+      throw new Error(response.error || 'Login failed');
+    }
+    const user = response.data?.user;
+    localStorage.setItem('user_data', JSON.stringify(user));
+    return {
+      id: user?.id || '',
+      name: user?.full_name || 'User',
+      email: user?.email || '',
+      avatar: user?.avatar_url || '',
+      enrolledCourses: [],
+      progress: {},
+    };
+  },
+
+  async register(name: string, email: string, password: string): Promise<AuthUser> {
+    const response = await api.auth.register(email, password, name);
+    if (!response.success) {
+      throw new Error(response.error || 'Registration failed');
+    }
+    const user = response.data?.user;
+    localStorage.setItem('user_data', JSON.stringify(user));
+    return {
+      id: user?.id || '',
+      name,
+      email,
+      avatar: '',
+      enrolledCourses: [],
+      progress: {},
+    };
+  },
+
+  async logout(): Promise<void> {
+    api.setToken(null);
+    localStorage.removeItem('user_data');
+  },
+
+  updateProgress(courseId: string, percentage: number): void {
+    console.warn('authUtils.updateProgress is deprecated. Use useAuth() hook instead.');
+  },
+
+  enrollCourse(courseId: string): void {
+    console.warn('authUtils.enrollCourse is deprecated. Use payment service instead.');
   }
 };

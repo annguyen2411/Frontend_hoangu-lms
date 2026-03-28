@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Share2, MoreVertical, Send } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { socialSystem, Post } from '../utils/socialSystem';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface SocialFeedProps {
@@ -13,7 +13,7 @@ interface SocialFeedProps {
 }
 
 export function SocialFeed({ userId, showCreatePost = true, filter = 'all' }: SocialFeedProps) {
-  const currentUser = authUtils.getCurrentUser();
+  const { user: currentUser, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
   const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>({});

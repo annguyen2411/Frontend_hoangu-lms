@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import { Settings as SettingsIcon, User, Bell, Lock, Globe, Moon, Zap, Download } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Label } from '../components/ui/Label';
 import { Switch } from '../components/ui/Switch';
 import { Separator } from '../components/ui/separator';
 import { OfflineCoursesManager } from '../components/OfflineCoursesManager';
+import { toast } from 'sonner';
+import { LoginPrompt } from '../components/LoginPrompt';
 
 export function Settings() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { profile, isAuthenticated, isLoading, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'offline'>('profile');
   const [notifications, setNotifications] = useState({
     email: true,
@@ -21,14 +21,65 @@ export function Settings() {
     achievements: true,
     promotions: false,
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
+    // Will show login prompt instead of navigating
+  }, [isAuthenticated]);
 
-  if (!user) return null;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPrompt />;
+  }
+
+  useEffect(() => {
+    if (profile) {
+      setNotifications({
+        email: profile.notification_enabled,
+        push: true,
+        sms: false,
+        lessons: true,
+        achievements: true,
+        promotions: false,
+      });
+    }
+  }, [profile]);
+
+  const handleSaveNotifications = async () => {
+    setSaving(true);
+    try {
+      await updateProfile({
+        notification_enabled: notifications.email,
+      });
+      toast.success('Đã lưu cài đặt thông báo');
+    } catch (error) {
+      toast.error('Không thể lưu cài đặt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    toast.success('Đã lưu cài đặt hồ sơ');
+  };
+
+  if (isLoading || !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-8 w-8 bg-[var(--primary)] rounded-full animate-bounce"></div>
+          <p className="mt-4 text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -237,8 +288,12 @@ export function Settings() {
             >
               Hủy
             </button>
-            <button className="px-6 py-3 bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity">
-              Lưu thay đổi
+            <button 
+              className="px-6 py-3 bg-gradient-to-r from-[var(--theme-gradient-from)] to-[var(--theme-gradient-to)] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              onClick={activeTab === 'notifications' ? handleSaveNotifications : handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
             </button>
           </div>
         </div>
@@ -246,3 +301,5 @@ export function Settings() {
     </div>
   );
 }
+
+export default Settings;

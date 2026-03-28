@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
 import { Zap, TrendingUp, BookOpen, Plus, X } from 'lucide-react';
-import { authUtils } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 import { FlashcardReview } from '../components/FlashcardReview';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { spacedRepetition } from '../utils/spacedRepetition';
 import { toast } from 'sonner';
+import { LoginPrompt, LoadingSpinner } from '../components/LoginPrompt';
 
 export function Flashcards() {
-  const navigate = useNavigate();
-  const user = authUtils.getCurrentUser();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'review' | 'browse'>('review');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCard, setNewCard] = useState({
@@ -21,12 +21,11 @@ export function Flashcards() {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-    }
-  }, [user, navigate]);
+    setLoading(false);
+  }, []);
 
-  if (!user) return null;
+  if (loading || isLoading) return <LoadingSpinner />;
+  if (!user) return <LoginPrompt />;
 
   const stats = spacedRepetition.getStats();
 
