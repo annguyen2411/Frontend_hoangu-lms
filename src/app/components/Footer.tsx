@@ -48,7 +48,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/auth" className="text-muted-foreground hover:text-[var(--primary)] transition-colors inline-flex items-center group">
+                <Link to="/?auth=login" className="text-muted-foreground hover:text-[var(--primary)] transition-colors inline-flex items-center group">
                   <span className="group-hover:translate-x-1 transition-transform">Đăng nhập</span>
                 </Link>
               </li>

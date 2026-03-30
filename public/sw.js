@@ -58,6 +58,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip non-http/https requests (chrome-extension, etc)
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
   // Network-first for API calls
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(

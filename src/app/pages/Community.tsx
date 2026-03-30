@@ -22,10 +22,10 @@ function LoginPrompt() {
           Bạn cần đăng nhập trước khi tiếp tục trải nghiệm các tính năng cộng đồng của HoaNgữ LMS.
         </p>
         <div className="flex gap-4 justify-center">
-          <Link to="/?mode=login">
+          <Link to="/?auth=login">
             <Button className="px-8">Đăng nhập</Button>
           </Link>
-          <Link to="/?mode=register">
+          <Link to="/?auth=register">
             <Button variant="outline" className="px-8">Đăng ký</Button>
           </Link>
         </div>

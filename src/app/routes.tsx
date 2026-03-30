@@ -1,13 +1,15 @@
-import { createBrowserRouter, Navigate } from 'react-router';
-import { lazy, Suspense } from 'react';
+import { createBrowserRouter, Navigate, useNavigate } from 'react-router';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { PageLoader } from './components/PageLoader';
+import { getDashboardPath } from './components/RoleRouteGuard';
+import { useAuth } from './contexts/AuthContext';
+import { adminAuthUtils } from './utils/adminAuth';
 
 const Courses = lazy(() => import('./pages/Courses').then(m => ({ default: m.Courses })));
 const CourseDetail = lazy(() => import('./pages/CourseDetail').then(m => ({ default: m.CourseDetail })));
 const Learn = lazy(() => import('./pages/Learn').then(m => ({ default: m.Learn })));
-const Auth = lazy(() => import('./pages/Auth').then(m => ({ default: m.Auth })));
 const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 
@@ -28,6 +30,7 @@ const Achievements = lazy(() => import('./pages/Achievements').then(m => ({ defa
 const StudyGroups = lazy(() => import('./pages/StudyGroups').then(m => ({ default: m.StudyGroups })));
 const Friends = lazy(() => import('./pages/Friends').then(m => ({ default: m.Friends })));
 const InstructorDashboard = lazy(() => import('./pages/InstructorDashboard').then(m => ({ default: m.InstructorDashboard })));
+const InstructorLayout = lazy(() => import('./components/InstructorLayout').then(m => ({ default: m.InstructorLayout })));
 const Practice = lazy(() => import('./pages/Practice').then(m => ({ default: m.Practice })));
 const VoicePractice = lazy(() => import('./pages/VoicePractice').then(m => ({ default: m.VoicePractice })));
 const Recommendations = lazy(() => import('./pages/Recommendations').then(m => ({ default: m.Recommendations })));
@@ -51,17 +54,62 @@ const AdminCertificates = lazy(() => import('./pages/admin/AdminCertificates').t
 
 const Checkout = lazy(() => import('./pages/payment/Checkout').then(m => ({ default: m.default })));
 
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import('./pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
+
 function Page({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
-// Redirect components
-function AuthRedirect() {
-  return <Navigate to="/?mode=login" replace />;
+function DashboardIndex() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      const path = getDashboardPath(user.role);
+      if (window.location.pathname === '/dashboard') {
+        window.location.href = path;
+      }
+    }
+  }, [user, isAuthenticated, isLoading]);
+  
+  if (isLoading) {
+    return <PageLoader />;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <Navigate to={getDashboardPath(user?.role || 'student')} replace />;
 }
 
-function RegisterRedirect() {
-  return <Navigate to="/?mode=register" replace />;
+function AdminIndex() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'admin' || user.role === 'super_admin') {
+        if (!adminAuthUtils.isAdminAuthenticated()) {
+          adminAuthUtils.syncAdminFromUser(user);
+        }
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
+    }
+  }, [user, isAuthenticated, isLoading, navigate]);
+  
+  if (isLoading) {
+    return <PageLoader />;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <PageLoader />;
 }
 
 export const router = createBrowserRouter([
@@ -116,22 +164,21 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Auth routes - redirect to home with modal
   {
-    path: 'auth',
+    path: 'forgot-password',
     element: (
       <Suspense fallback={<PageLoader />}>
-        <Auth />
+        <ForgotPassword />
       </Suspense>
     ),
   },
   {
-    path: 'login',
-    element: <AuthRedirect />,
-  },
-  {
-    path: 'register',
-    element: <RegisterRedirect />,
+    path: 'reset-password',
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <ResetPassword />
+      </Suspense>
+    ),
   },
   // Checkout
   {
@@ -152,11 +199,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: 'dashboard',
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Overview />
-          </Suspense>
-        ),
+        element: <DashboardIndex />,
       },
       {
         path: 'dashboard/my-courses',
@@ -211,14 +254,6 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Friends />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'instructor',
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <InstructorDashboard />
           </Suspense>
         ),
       },
@@ -320,17 +355,92 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  // Instructor routes
+  {
+    path: 'instructor',
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <InstructorLayout />
+      </Suspense>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/instructor/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'courses',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'students',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'revenue',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'analytics',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'quizzes',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'messages',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'settings',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <InstructorDashboard />
+          </Suspense>
+        ),
+      },
+    ],
+  },
   // Admin routes
   {
     path: 'admin',
     children: [
       {
         index: true,
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <AdminLogin />
-          </Suspense>
-        ),
+        element: <AdminIndex />,
       },
       {
         element: (

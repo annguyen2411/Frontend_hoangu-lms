@@ -1,11 +1,52 @@
 import type { ApiResponse } from '../types/database';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Dynamic API URL - uses current host if available, fallback to env or localhost
+const getApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // For network access, construct URL from current location
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+  }
+  return 'http://localhost:3000/api';
+};
+
+const API_BASE_URL = getApiUrl();
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: any;
   headers?: Record<string, string>;
+}
+
+// Input validation utilities
+const validators = {
+  isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  },
+
+  isValidPassword(password: string): boolean {
+    return password && password.length >= 6;
+  },
+
+  isValidName(name: string): boolean {
+    return name && name.trim().length >= 2 && name.length <= 100;
+  },
+
+  sanitizeInput(input: string): string {
+    return input.trim().replace(/[<>]/g, '');
+  },
+
+  isValidId(id: string): boolean {
+    return /^[a-zA-Z0-9_-]+$/.test(id);
+  }
+};
+
+function ValidationError(message: string) {
+  this.message = message;
+  this.name = 'ValidationError';
 }
 
 class ApiClient {
@@ -47,17 +88,35 @@ class ApiClient {
     }
 
     if (body) {
-      config.body = JSON.stringify(body);
+      try {
+        config.body = JSON.stringify(body);
+      } catch {
+        throw new Error('Invalid body data');
+      }
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+      
+      if (!response.ok) {
+        let errorMessage = 'Request failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
+      const data = await response.json();
+      return data as T;
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối internet.');
+      }
+      throw error;
     }
-
-    return data as T;
   }
 
   private get<T>(endpoint: string): Promise<T> {
@@ -77,34 +136,112 @@ class ApiClient {
   }
 
   auth = {
-    register: (email: string, password: string, full_name: string) =>
-      this.post<ApiResponse<{ user: any; token: string }>>('/auth/register', { email, password, full_name }),
+    register: (email: string, password: string, full_name: string) => {
+      if (!validators.isValidEmail(email)) {
+        return Promise.reject(new Error('Email không hợp lệ'));
+      }
+      if (!validators.isValidPassword(password)) {
+        return Promise.reject(new Error('Mật khẩu phải có ít nhất 6 ký tự'));
+      }
+      if (!validators.isValidName(full_name)) {
+        return Promise.reject(new Error('Tên phải có ít nhất 2 ký tự'));
+      }
+      return this.post<ApiResponse<{ user: any; token: string }>>('/auth/register', { 
+        email: validators.sanitizeInput(email), 
+        password, 
+        full_name: validators.sanitizeInput(full_name) 
+      });
+    },
     
-    login: (email: string, password: string) =>
-      this.post<ApiResponse<{ user: any; token: string }>>('/auth/login', { email, password }),
+    login: (email: string, password: string) => {
+      if (!email || !password) {
+        return Promise.reject(new Error('Vui lòng nhập email và mật khẩu'));
+      }
+      return this.post<ApiResponse<{ user: any; token: string }>>('/auth/login', { email, password });
+    },
     
     getMe: () => this.get<ApiResponse<any>>('/auth/me'),
     
-    updateProfile: (data: { full_name?: string; avatar_url?: string; language?: string; theme?: string; notification_enabled?: boolean }) =>
-      this.put<ApiResponse<any>>('/auth/me', data),
+    updateProfile: (data: { full_name?: string; avatar_url?: string; language?: string; theme?: string; notification_enabled?: boolean }) => {
+      if (data.full_name && !validators.isValidName(data.full_name)) {
+        return Promise.reject(new Error('Tên không hợp lệ'));
+      }
+      return this.put<ApiResponse<any>>('/auth/me', data);
+    },
     
-    changePassword: (current_password: string, new_password: string) =>
-      this.put<ApiResponse<any>>('/auth/password', { current_password, new_password }),
+    changePassword: (current_password: string, new_password: string) => {
+      if (!current_password) {
+        return Promise.reject(new Error('Vui lòng nhập mật khẩu hiện tại'));
+      }
+      if (!validators.isValidPassword(new_password)) {
+        return Promise.reject(new Error('Mật khẩu mới phải có ít nhất 6 ký tự'));
+      }
+      return this.put<ApiResponse<any>>('/auth/password', { current_password, new_password });
+    },
+    
+    forgotPassword: (email: string) => {
+      if (!email || !validators.isValidEmail(email)) {
+        return Promise.reject(new Error('Vui lòng nhập email hợp lệ'));
+      }
+      return this.post<ApiResponse<any>>('/auth/forgot-password', { email });
+    },
+    
+    resetPassword: (token: string, new_password: string) => {
+      if (!token) {
+        return Promise.reject(new Error('Token không hợp lệ'));
+      }
+      if (!validators.isValidPassword(new_password)) {
+        return Promise.reject(new Error('Mật khẩu phải có ít nhất 6 ký tự'));
+      }
+      return this.post<ApiResponse<any>>('/auth/reset-password', { token, new_password });
+    },
   };
 
   courses = {
-    getAll: (params?: { category?: string; level?: string; featured?: boolean; published?: boolean; page?: number; limit?: number }) =>
+    getAll: (params?: { category?: string; level?: string; featured?: boolean; published?: boolean; page?: number; limit?: number; free?: boolean }) =>
       this.get<ApiResponse<any[]>>(`/courses?${new URLSearchParams(params as any).toString()}`),
     
-    getBySlug: (slug: string) => this.get<ApiResponse<any>>(`/courses/slug/${slug}`),
+    getBySlug: (slug: string) => {
+      if (!slug || slug.length > 200) {
+        return Promise.reject(new Error('Slug không hợp lệ'));
+      }
+      return this.get<ApiResponse<any>>(`/courses/slug/${encodeURIComponent(slug)}`);
+    },
     
-    getById: (id: string) => this.get<ApiResponse<any>>(`/courses/${id}`),
+    getById: (id: string) => {
+      if (!validators.isValidId(id)) {
+        return Promise.reject(new Error('ID không hợp lệ'));
+      }
+      return this.get<ApiResponse<any>>(`/courses/${encodeURIComponent(id)}`);
+    },
     
-    create: (course: any) => this.post<ApiResponse<any>>('/courses', course),
+    create: (course: any) => {
+      if (!course?.title || course.title.trim().length < 3) {
+        return Promise.reject(new Error('Tiêu đề khóa học phải có ít nhất 3 ký tự'));
+      }
+      return this.post<ApiResponse<any>>('/courses', course);
+    },
     
-    update: (id: string, course: any) => this.put<ApiResponse<any>>(`/courses/${id}`, course),
+    update: (id: string, course: any) => {
+      if (!validators.isValidId(id)) {
+        return Promise.reject(new Error('ID không hợp lệ'));
+      }
+      return this.put<ApiResponse<any>>(`/courses/${encodeURIComponent(id)}`, course);
+    },
     
-    delete: (id: string) => this.delete<ApiResponse<any>>(`/courses/${id}`),
+    delete: (id: string) => {
+      if (!validators.isValidId(id)) {
+        return Promise.reject(new Error('ID không hợp lệ'));
+      }
+      return this.delete<ApiResponse<any>>(`/courses/${encodeURIComponent(id)}`);
+    },
+    
+    checkAccess: (id: string) => {
+      if (!validators.isValidId(id)) {
+        return Promise.reject(new Error('ID không hợp lệ'));
+      }
+      return this.get<ApiResponse<any>>(`/courses/${encodeURIComponent(id)}/check-access`);
+    },
   };
 
   lessons = {
@@ -113,11 +250,20 @@ class ApiClient {
     
     getById: (id: string) => this.get<ApiResponse<any>>(`/lessons/${id}`),
     
+    getResources: (lessonId: string) => this.get<ApiResponse<any[]>>(`/lessons/${lessonId}/resources`),
+    
     create: (lesson: any) => this.post<ApiResponse<any>>('/lessons', lesson),
     
     update: (id: string, lesson: any) => this.put<ApiResponse<any>>(`/lessons/${id}`, lesson),
     
     delete: (id: string) => this.delete<ApiResponse<any>>(`/lessons/${id}`),
+  };
+
+  quizzes = {
+    getByLesson: (lessonId: string) => this.get<ApiResponse<any[]>>(`/student/exercises/lesson/${lessonId}`),
+    
+    submitAnswer: (exercise_id: string, user_answer: string) =>
+      this.post<ApiResponse<any>>('/student/exercises/submit', { exercise_id, user_answer }),
   };
 
   enrollments = {
@@ -168,13 +314,13 @@ class ApiClient {
   admin = {
     getStats: () => this.get<ApiResponse<any>>('/admin/stats'),
     
-    getUsers: (params?: { search?: string; page?: number; limit?: number }) =>
+    getUsers: (params?: { search?: string; page?: number; limit?: number; role?: string; mshv?: string }) =>
       this.get<ApiResponse<any[]>>(`/admin/users?${new URLSearchParams(params as any).toString()}`),
     
-    createUser: (data: { full_name: string; email: string; password: string; role: string }) =>
+    createUser: (data: { full_name: string; email: string; password: string; role: string; mshv?: string }) =>
       this.post<ApiResponse<any>>('/admin/users', data),
     
-    updateUser: (id: string, data: { full_name?: string; role?: string; level?: number; coins?: number }) =>
+    updateUser: (id: string, data: { full_name?: string; role?: string; level?: number; coins?: number; mshv?: string }) =>
       this.put<ApiResponse<any>>(`/admin/users/${id}`, data),
     
     deleteUser: (id: string) => this.delete<ApiResponse<any>>(`/admin/users/${id}`),
@@ -188,6 +334,11 @@ class ApiClient {
     getPendingCourses: () => this.get<ApiResponse<any[]>>('/admin/courses/pending'),
     approveCourse: (id: string) => this.put<ApiResponse<any>>(`/admin/courses/${id}/approve`, {}),
     rejectCourse: (id: string, reason: string) => this.put<ApiResponse<any>>(`/admin/courses/${id}/reject`, { reason }),
+    
+    // Free Users Management
+    getFreeUsers: (courseId: string) => this.get<ApiResponse<any[]>>(`/admin/courses/${courseId}/free-users`),
+    addFreeUser: (courseId: string, userId: string) => this.post<ApiResponse<any>>(`/admin/courses/${courseId}/free-users`, { userId, action: 'add' }),
+    removeFreeUser: (courseId: string, userId: string) => this.post<ApiResponse<any>>(`/admin/courses/${courseId}/free-users`, { userId, action: 'remove' }),
     
     // Analytics
     getRevenueAnalytics: (period?: number) => this.get<ApiResponse<any[]>>(`/admin/analytics/revenue?period=${period || 30}`),
@@ -331,6 +482,47 @@ class ApiClient {
       this.post<ApiResponse<any>>('/instructors/profile', data),
     assignCourse: (courseId: string, teacherId: string) =>
       this.put<ApiResponse<any>>('/instructors/assign-course', { course_id: courseId, teacher_id: teacherId }),
+    
+    // Grammar Exercises
+    getExercises: (lessonId: string) => this.get<ApiResponse<any[]>>(`/instructors/exercises/lesson/${lessonId}`),
+    createExercise: (data: { lesson_id: string; question: string; question_type?: string; options?: string[]; correct_answer: string; explanation?: string; difficulty?: string; order_index?: number }) =>
+      this.post<ApiResponse<any>>('/instructors/exercises', data),
+    updateExercise: (id: string, data: { question?: string; question_type?: string; options?: string[]; correct_answer?: string; explanation?: string; difficulty?: string; order_index?: number }) =>
+      this.put<ApiResponse<any>>(`/instructors/exercises/${id}`, data),
+    deleteExercise: (id: string) => this.delete<ApiResponse<any>>(`/instructors/exercises/${id}`),
+    
+    // Vocabulary
+    getVocabulary: (lessonId: string) => this.get<ApiResponse<any[]>>(`/instructors/vocabulary/lesson/${lessonId}`),
+    createVocabulary: (data: { lesson_id: string; word: string; pinyin?: string; meaning: string; example_sentence?: string; audio_url?: string; image_url?: string; category?: string; hsk_level?: number }) =>
+      this.post<ApiResponse<any>>('/instructors/vocabulary', data),
+    updateVocabulary: (id: string, data: { word?: string; pinyin?: string; meaning?: string; example_sentence?: string; audio_url?: string; image_url?: string; category?: string; hsk_level?: number }) =>
+      this.put<ApiResponse<any>>(`/instructors/vocabulary/${id}`, data),
+    deleteVocabulary: (id: string) => this.delete<ApiResponse<any>>(`/instructors/vocabulary/${id}`),
+    
+    // Lesson Resources
+    getResources: (lessonId: string) => this.get<ApiResponse<any[]>>(`/instructors/resources/lesson/${lessonId}`),
+    createResource: (data: { lesson_id: string; title: string; type: string; url: string; description?: string }) =>
+      this.post<ApiResponse<any>>('/instructors/resources', data),
+    updateResource: (id: string, data: { title?: string; type?: string; url?: string; description?: string }) =>
+      this.put<ApiResponse<any>>(`/instructors/resources/${id}`, data),
+    deleteResource: (id: string) => this.delete<ApiResponse<any>>(`/instructors/resources/${id}`),
+    
+    // Student Progress
+    getStudentProgress: (courseId: string) => this.get<ApiResponse<any[]>>(`/instructors/student-progress/${courseId}`),
+    
+    // Bulk Import Lessons
+    importLessons: async (courseId: string, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('course_id', courseId);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/instructors/lessons/import`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      return response.json();
+    },
   };
 
   student = {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { BookOpen, Plus, Edit, Trash2, Video, Eye, Users, Clock, Check, X, Save, GraduationCap, BarChart3, MessageCircle, DollarSign, Send, User, LayoutDashboard } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { BookOpen, Plus, Edit, Trash2, Video, Eye, Users, Clock, Check, X, Save, GraduationCap, BarChart3, MessageCircle, DollarSign, Send, User, LayoutDashboard, Upload, FileText, List, TrendingUp, Play, BookMarked, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
@@ -47,10 +47,55 @@ export function InstructorDashboard() {
     is_published: true,
   });
 
-  const [activeTab, setActiveTab] = useState<'courses' | 'create' | 'stats' | 'messages'>('courses');
+  const [activeTab, setActiveTab] = useState<'courses' | 'exercises' | 'vocabulary' | 'resources' | 'progress' | 'stats' | 'messages'>('courses');
   const [stats, setStats] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [exercises, setExercises] = useState<any[]>([]);
+  const [vocabulary, setVocabulary] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [studentProgress, setStudentProgress] = useState<any[]>([]);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [showVocabularyModal, setShowVocabularyModal] = useState(false);
+  const [showResourceModal, setShowResourceModal] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<any>(null);
+  const [editingVocab, setEditingVocab] = useState<any>(null);
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [loadingStates, setLoadingStates] = useState({
+    courses: false,
+    lessons: false,
+    exercises: false,
+    vocabulary: false,
+    resources: false,
+    progress: false,
+    saving: false,
+  });
+  const [exerciseForm, setExerciseForm] = useState({
+    question: '',
+    question_type: 'multiple_choice',
+    options: ['', '', '', ''],
+    correct_answer: '',
+    explanation: '',
+    difficulty: 'medium',
+  });
+  const [vocabForm, setVocabForm] = useState({
+    word: '',
+    pinyin: '',
+    meaning: '',
+    example_sentence: '',
+    category: '',
+    hsk_level: 1,
+  });
+  const [resourceForm, setResourceForm] = useState({
+    title: '',
+    type: 'pdf',
+    url: '',
+    description: '',
+  });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [courseForm, setCourseForm] = useState({
     title: '',
@@ -102,6 +147,58 @@ export function InstructorDashboard() {
     } catch (err) { console.error('Failed to fetch messages:', err); }
   };
 
+  const fetchExercises = async (lessonId: string) => {
+    setLoadingStates(prev => ({ ...prev, exercises: true }));
+    try {
+      const res = await api.instructors.getExercises(lessonId);
+      if (res.success) setExercises(res.data || []);
+    } catch (err) { 
+      console.error('Failed to fetch exercises:', err);
+      toast.error('Không thể tải danh sách bài tập');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, exercises: false }));
+    }
+  };
+
+  const fetchVocabulary = async (lessonId: string) => {
+    setLoadingStates(prev => ({ ...prev, vocabulary: true }));
+    try {
+      const res = await api.instructors.getVocabulary(lessonId);
+      if (res.success) setVocabulary(res.data || []);
+    } catch (err) { 
+      console.error('Failed to fetch vocabulary:', err);
+      toast.error('Không thể tải danh sách từ vựng');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, vocabulary: false }));
+    }
+  };
+
+  const fetchResources = async (lessonId: string) => {
+    setLoadingStates(prev => ({ ...prev, resources: true }));
+    try {
+      const res = await api.instructors.getResources(lessonId);
+      if (res.success) setResources(res.data || []);
+    } catch (err) { 
+      console.error('Failed to fetch resources:', err);
+      toast.error('Không thể tải danh sách tài liệu');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, resources: false }));
+    }
+  };
+
+  const fetchStudentProgress = async (courseId: string) => {
+    setLoadingStates(prev => ({ ...prev, progress: true }));
+    try {
+      const res = await api.instructors.getStudentProgress(courseId);
+      if (res.success) setStudentProgress(res.data || []);
+    } catch (err) { 
+      console.error('Failed to fetch student progress:', err);
+      toast.error('Không thể tải tiến độ học viên');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, progress: false }));
+    }
+  };
+
   if (!isInstructor) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -117,6 +214,7 @@ export function InstructorDashboard() {
   }
 
   const fetchMyCourses = async () => {
+    setLoadingStates(prev => ({ ...prev, courses: true }));
     try {
       const response = await api.instructors.getMyCourses();
       if (response.success && response.data) {
@@ -124,12 +222,14 @@ export function InstructorDashboard() {
       }
     } catch (err) {
       console.error('Failed to fetch courses:', err);
+      toast.error('Không thể tải danh sách khóa học');
     } finally {
-      setLoading(false);
+      setLoadingStates(prev => ({ ...prev, courses: false }));
     }
   };
 
   const fetchLessons = async (courseId: string) => {
+    setLoadingStates(prev => ({ ...prev, lessons: true }));
     try {
       const response = await api.lessons.getByCourse(courseId);
       if (response.success && response.data) {
@@ -137,6 +237,9 @@ export function InstructorDashboard() {
       }
     } catch (err) {
       console.error('Failed to fetch lessons:', err);
+      toast.error('Không thể tải danh sách bài học');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, lessons: false }));
     }
   };
 
@@ -198,6 +301,192 @@ export function InstructorDashboard() {
     setEditingLesson(null);
     setLessonForm({ title: '', description: '', video_id: '', video_duration: 0, is_free: false, is_published: true });
     setShowLessonModal(true);
+  };
+
+  const handleSelectLesson = (lesson: Lesson) => {
+    setSelectedLesson(lesson);
+    if (activeTab === 'exercises') {
+      fetchExercises(lesson.id);
+    } else if (activeTab === 'vocabulary') {
+      fetchVocabulary(lesson.id);
+    } else if (activeTab === 'resources') {
+      fetchResources(lesson.id);
+    }
+  };
+
+  const handleSaveExercise = async () => {
+    if (!selectedLesson) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      if (editingExercise) {
+        await api.instructors.updateExercise(editingExercise.id, exerciseForm);
+        toast.success('Cập nhật bài tập thành công');
+      } else {
+        await api.instructors.createExercise({ ...exerciseForm, lesson_id: selectedLesson.id });
+        toast.success('Thêm bài tập thành công');
+      }
+      setShowExerciseModal(false);
+      setEditingExercise(null);
+      setExerciseForm({ question: '', question_type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', explanation: '', difficulty: 'medium' });
+      fetchExercises(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to save exercise:', err);
+      toast.error('Không thể lưu bài tập');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const handleDeleteExercise = async (id: string) => {
+    if (!selectedLesson || !confirm('Xóa bài tập này?')) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      await api.instructors.deleteExercise(id);
+      toast.success('Xóa bài tập thành công');
+      fetchExercises(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to delete exercise:', err);
+      toast.error('Không thể xóa bài tập');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const openEditExercise = (ex: any) => {
+    setEditingExercise(ex);
+    setExerciseForm({
+      question: ex.question,
+      question_type: ex.question_type || 'multiple_choice',
+      options: ex.options || ['', '', '', ''],
+      correct_answer: ex.correct_answer || '',
+      explanation: ex.explanation || '',
+      difficulty: ex.difficulty || 'medium',
+    });
+    setShowExerciseModal(true);
+  };
+
+  const handleSaveVocab = async () => {
+    if (!selectedLesson) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      if (editingVocab) {
+        await api.instructors.updateVocabulary(editingVocab.id, vocabForm);
+        toast.success('Cập nhật từ vựng thành công');
+      } else {
+        await api.instructors.createVocabulary({ ...vocabForm, lesson_id: selectedLesson.id });
+        toast.success('Thêm từ vựng thành công');
+      }
+      setShowVocabularyModal(false);
+      setEditingVocab(null);
+      setVocabForm({ word: '', pinyin: '', meaning: '', example_sentence: '', category: '', hsk_level: 1 });
+      fetchVocabulary(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to save vocabulary:', err);
+      toast.error('Không thể lưu từ vựng');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const handleDeleteVocab = async (id: string) => {
+    if (!selectedLesson || !confirm('Xóa từ vựng này?')) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      await api.instructors.deleteVocabulary(id);
+      toast.success('Xóa từ vựng thành công');
+      fetchVocabulary(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to delete vocabulary:', err);
+      toast.error('Không thể xóa từ vựng');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const openEditVocab = (vocab: any) => {
+    setEditingVocab(vocab);
+    setVocabForm({
+      word: vocab.word || '',
+      pinyin: vocab.pinyin || '',
+      meaning: vocab.meaning || '',
+      example_sentence: vocab.example_sentence || '',
+      category: vocab.category || '',
+      hsk_level: vocab.hsk_level || 1,
+    });
+    setShowVocabularyModal(true);
+  };
+
+  const handleSaveResource = async () => {
+    if (!selectedLesson) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      if (editingResource) {
+        await api.instructors.updateResource(editingResource.id, resourceForm);
+        toast.success('Cập nhật tài liệu thành công');
+      } else {
+        await api.instructors.createResource({ ...resourceForm, lesson_id: selectedLesson.id });
+        toast.success('Thêm tài liệu thành công');
+      }
+      setShowResourceModal(false);
+      setEditingResource(null);
+      setResourceForm({ title: '', type: 'pdf', url: '', description: '' });
+      fetchResources(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to save resource:', err);
+      toast.error('Không thể lưu tài liệu');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    if (!selectedLesson || !confirm('Xóa tài liệu này?')) return;
+    setLoadingStates(prev => ({ ...prev, saving: true }));
+    try {
+      await api.instructors.deleteResource(id);
+      toast.success('Xóa tài liệu thành công');
+      fetchResources(selectedLesson.id);
+    } catch (err) { 
+      console.error('Failed to delete resource:', err);
+      toast.error('Không thể xóa tài liệu');
+    } finally {
+      setLoadingStates(prev => ({ ...prev, saving: false }));
+    }
+  };
+
+  const openEditResource = (res: any) => {
+    setEditingResource(res);
+    setResourceForm({
+      title: res.title || '',
+      type: res.type || 'pdf',
+      url: res.url || '',
+      description: res.description || '',
+    });
+    setShowResourceModal(true);
+  };
+
+  const handleImportLessons = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourse || !fileInputRef.current?.files?.length) return;
+    const file = fileInputRef.current.files[0];
+    if (!file) return;
+    
+    setImporting(true);
+    try {
+      const res = await api.instructors.importLessons(selectedCourse.id, file);
+      if (res.success) {
+        toast.success(`Import thành công ${res.data.imported} bài học!`);
+        setShowImportModal(false);
+        fetchLessons(selectedCourse.id);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        toast.error(res.error || 'Lỗi khi import');
+      }
+    } catch (err) {
+      toast.error('Lỗi khi import');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -279,6 +568,38 @@ export function InstructorDashboard() {
               }`}
             >
               <LayoutDashboard className="h-4 w-4" /> Khóa học
+            </button>
+            <button
+              onClick={() => setActiveTab('exercises')}
+              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'exercises' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FileText className="h-4 w-4" /> Bài tập
+            </button>
+            <button
+              onClick={() => setActiveTab('vocabulary')}
+              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'vocabulary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <BookMarked className="h-4 w-4" /> Từ vựng
+            </button>
+            <button
+              onClick={() => setActiveTab('resources')}
+              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'resources' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Download className="h-4 w-4" /> Tài liệu
+            </button>
+            <button
+              onClick={() => setActiveTab('progress')}
+              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'progress' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <TrendingUp className="h-4 w-4" /> Tiến độ
             </button>
             <button
               onClick={() => setActiveTab('stats')}
@@ -474,6 +795,350 @@ export function InstructorDashboard() {
           </div>
         )}
 
+        {/* Exercises Tab */}
+        {activeTab === 'exercises' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Chọn khóa học</h2>
+              </div>
+              <div className="space-y-3">
+                {courses.map(course => (
+                  <Card 
+                    key={course.id} 
+                    className={`p-4 cursor-pointer transition-all ${selectedCourse?.id === course.id ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => { setSelectedCourse(course); fetchLessons(course.id); }}
+                  >
+                    <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                    <p className="text-sm text-gray-500">{course.total_lessons || 0} bài học</p>
+                  </Card>
+                ))}
+              </div>
+              {selectedCourse && lessons.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Chọn bài học</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {lessons.map((lesson, idx) => (
+                      <div 
+                        key={lesson.id}
+                        onClick={() => handleSelectLesson(lesson)}
+                        className={`p-2 rounded cursor-pointer ${selectedLesson?.id === lesson.id ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'} border`}
+                      >
+                        <span className="font-medium">{idx + 1}. {lesson.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              {selectedLesson ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Bài tập: {selectedLesson.title}
+                    </h2>
+                    <Button onClick={() => { setEditingExercise(null); setExerciseForm({ question: '', question_type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', explanation: '', difficulty: 'medium' }); setShowExerciseModal(true); }}>
+                      <Plus className="h-4 w-4 mr-2" /> Thêm bài tập
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {exercises.map((ex) => (
+                      <Card key={ex.id} className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">{ex.question_type || 'multiple_choice'}</span>
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-800 text-xs rounded-full">{ex.difficulty || 'medium'}</span>
+                            </div>
+                            <p className="font-medium text-gray-900">{ex.question}</p>
+                            {ex.options && ex.options.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {ex.options.map((opt: string, i: number) => (
+                                  <p key={i} className={`text-sm ${ex.correct_answer === opt ? 'text-green-600 font-medium' : 'text-gray-600'}`}>
+                                    {String.fromCharCode(65 + i)}. {opt} {ex.correct_answer === opt && '✓'}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {ex.explanation && <p className="mt-2 text-sm text-gray-500 italic">Giải thích: {ex.explanation}</p>}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => openEditExercise(ex)}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDeleteExercise(ex.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {exercises.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>Chưa có bài tập nào</p>
+                        <Button className="mt-2" onClick={() => { setEditingExercise(null); setExerciseForm({ question: '', question_type: 'multiple_choice', options: ['', '', '', ''], correct_answer: '', explanation: '', difficulty: 'medium' }); setShowExerciseModal(true); }}>
+                          <Plus className="h-4 w-4 mr-2" /> Thêm bài tập đầu tiên
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-500">
+                  <div className="text-center">
+                    <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Chọn khóa học và bài học để quản lý bài tập</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vocabulary Tab */}
+        {activeTab === 'vocabulary' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Chọn khóa học</h2>
+              </div>
+              <div className="space-y-3">
+                {courses.map(course => (
+                  <Card 
+                    key={course.id} 
+                    className={`p-4 cursor-pointer transition-all ${selectedCourse?.id === course.id ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => { setSelectedCourse(course); fetchLessons(course.id); }}
+                  >
+                    <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                    <p className="text-sm text-gray-500">{course.total_lessons || 0} bài học</p>
+                  </Card>
+                ))}
+              </div>
+              {selectedCourse && lessons.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Chọn bài học</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {lessons.map((lesson, idx) => (
+                      <div 
+                        key={lesson.id}
+                        onClick={() => handleSelectLesson(lesson)}
+                        className={`p-2 rounded cursor-pointer ${selectedLesson?.id === lesson.id ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'} border`}
+                      >
+                        <span className="font-medium">{idx + 1}. {lesson.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              {selectedLesson ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Từ vựng: {selectedLesson.title}
+                    </h2>
+                    <Button onClick={() => { setEditingVocab(null); setVocabForm({ word: '', pinyin: '', meaning: '', example_sentence: '', category: '', hsk_level: 1 }); setShowVocabularyModal(true); }}>
+                      <Plus className="h-4 w-4 mr-2" /> Thêm từ vựng
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {vocabulary.map((vocab) => (
+                      <Card key={vocab.id} className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xl font-bold text-red-600">{vocab.word}</span>
+                              <span className="text-sm text-gray-500">{vocab.pinyin}</span>
+                            </div>
+                            <p className="font-medium text-gray-900">{vocab.meaning}</p>
+                            {vocab.example_sentence && <p className="mt-1 text-sm text-gray-500 italic">"{vocab.example_sentence}"</p>}
+                            {vocab.category && <span className="mt-2 inline-block px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">{vocab.category}</span>}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => openEditVocab(vocab)}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDeleteVocab(vocab.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {vocabulary.length === 0 && (
+                      <div className="col-span-2 text-center py-8 text-gray-500">
+                        <BookMarked className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>Chưa có từ vựng nào</p>
+                        <Button className="mt-2" onClick={() => { setEditingVocab(null); setVocabForm({ word: '', pinyin: '', meaning: '', example_sentence: '', category: '', hsk_level: 1 }); setShowVocabularyModal(true); }}>
+                          <Plus className="h-4 w-4 mr-2" /> Thêm từ vựng đầu tiên
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-500">
+                  <div className="text-center">
+                    <BookMarked className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Chọn khóa học và bài học để quản lý từ vựng</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Resources Tab */}
+        {activeTab === 'resources' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Chọn khóa học</h2>
+              </div>
+              <div className="space-y-3">
+                {courses.map(course => (
+                  <Card 
+                    key={course.id} 
+                    className={`p-4 cursor-pointer transition-all ${selectedCourse?.id === course.id ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => { setSelectedCourse(course); fetchLessons(course.id); }}
+                  >
+                    <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                    <p className="text-sm text-gray-500">{course.total_lessons || 0} bài học</p>
+                  </Card>
+                ))}
+              </div>
+              {selectedCourse && lessons.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Chọn bài học</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {lessons.map((lesson, idx) => (
+                      <div 
+                        key={lesson.id}
+                        onClick={() => handleSelectLesson(lesson)}
+                        className={`p-2 rounded cursor-pointer ${selectedLesson?.id === lesson.id ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'} border`}
+                      >
+                        <span className="font-medium">{idx + 1}. {lesson.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="lg:col-span-2">
+              {selectedLesson ? (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Tài liệu: {selectedLesson.title}
+                    </h2>
+                    <Button onClick={() => { setEditingResource(null); setResourceForm({ title: '', type: 'pdf', url: '', description: '' }); setShowResourceModal(true); }}>
+                      <Plus className="h-4 w-4 mr-2" /> Thêm tài liệu
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {resources.map((res) => (
+                      <Card key={res.id} className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 rounded-lg ${res.type === 'pdf' ? 'bg-red-100' : res.type === 'video' ? 'bg-blue-100' : 'bg-green-100'}`}>
+                              {res.type === 'pdf' ? <FileText className="h-5 w-5 text-red-600" /> : res.type === 'video' ? <Play className="h-5 w-5 text-blue-600" /> : <Download className="h-5 w-5 text-green-600" />}
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{res.title}</h4>
+                              <p className="text-sm text-gray-500">{res.description || 'Không có mô tả'}</p>
+                              <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">{res.url}</a>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => openEditResource(res)}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDeleteResource(res.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {resources.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Download className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>Chưa có tài liệu nào</p>
+                        <Button className="mt-2" onClick={() => { setEditingResource(null); setResourceForm({ title: '', type: 'pdf', url: '', description: '' }); setShowResourceModal(true); }}>
+                          <Plus className="h-4 w-4 mr-2" /> Thêm tài liệu đầu tiên
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-500">
+                  <div className="text-center">
+                    <Download className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Chọn khóa học và bài học để quản lý tài liệu</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Progress Tab */}
+        {activeTab === 'progress' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Chọn khóa học</h2>
+              </div>
+              <div className="space-y-3">
+                {courses.map(course => (
+                  <Card 
+                    key={course.id} 
+                    className={`p-4 cursor-pointer transition-all ${selectedCourse?.id === course.id ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => { setSelectedCourse(course); fetchStudentProgress(course.id); }}
+                  >
+                    <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                    <p className="text-sm text-gray-500">{course.students_enrolled || 0} học viên</p>
+                  </Card>
+                ))}
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              {selectedCourse ? (
+                <>
+                  <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Tiến độ học viên: {selectedCourse.title}
+                    </h2>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Học viên</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Bài học đã học</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tiến độ</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lần cuối</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {studentProgress.length === 0 ? (
+                          <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">Chưa có dữ liệu tiến độ</td></tr>
+                        ) : studentProgress.map((sp, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4"><div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="font-medium">{sp.full_name}</span></div></td>
+                            <td className="px-6 py-4">{sp.lessons_completed || 0} / {selectedCourse.total_lessons || 0}</td>
+                            <td className="px-6 py-4"><div className="w-24 bg-gray-200 rounded-full h-2"><div className="bg-green-600 h-2 rounded-full" style={{ width: `${sp.progress_percent || 0}%` }} /></div><span className="text-sm">{sp.progress_percent || 0}%</span></td>
+                            <td className="px-6 py-4 text-gray-500">{sp.last_activity ? new Date(sp.last_activity).toLocaleDateString('vi-VN') : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-500">
+                  <div className="text-center">
+                    <TrendingUp className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p>Chọn khóa học để xem tiến độ học viên</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'courses' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Course List */}
@@ -523,10 +1188,16 @@ export function InstructorDashboard() {
                   <h2 className="text-lg font-semibold text-gray-900">
                     Bài học: {selectedCourse.title}
                   </h2>
-                  <Button onClick={openNewLesson}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Thêm bài học
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowImportModal(true)} disabled={!selectedCourse}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import CSV
+                    </Button>
+                    <Button onClick={openNewLesson}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Thêm bài học
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -596,6 +1267,46 @@ export function InstructorDashboard() {
         </div>
         )}
 
+        {/* Import Lessons Modal */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md p-6">
+              <h2 className="text-xl font-bold mb-4">Import bài học từ CSV</h2>
+              <form onSubmit={handleImportLessons} className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Chọn khóa học: <span className="font-medium">{selectedCourse?.title}</span>
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">File CSV</label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".csv"
+                    className="w-full border rounded-lg p-2 text-sm"
+                  />
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg text-sm">
+                  <p className="font-medium mb-1">Định dạng CSV:</p>
+                  <code className="text-xs text-gray-600">
+                    title,description,video_id,video_duration,is_free,is_published
+                  </code>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ví dụ: Bài 1 - Chào hỏi,Video mở đầu,dQw4w9WgXcQ,300,true,true
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setShowImportModal(false)}>Hủy</Button>
+                  <Button type="submit" className="flex-1" disabled={importing}>
+                    {importing ? 'Đang import...' : 'Import'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
+
         {/* Lesson Modal */}
         {showLessonModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -662,9 +1373,247 @@ export function InstructorDashboard() {
                   <Button variant="outline" onClick={() => setShowLessonModal(false)} className="flex-1">
                     Hủy
                   </Button>
-                  <Button onClick={handleSaveLesson} className="flex-1">
+                  <Button onClick={handleSaveLesson} className="flex-1" disabled={loadingStates.saving}>
                     <Save className="h-4 w-4 mr-2" />
                     Lưu
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Exercise Modal */}
+        {showExerciseModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold mb-4">
+                {editingExercise ? 'Sửa bài tập' : 'Thêm bài tập mới'}
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Câu hỏi</label>
+                  <textarea
+                    className="w-full p-3 border rounded-lg"
+                    value={exerciseForm.question}
+                    onChange={(e) => setExerciseForm({ ...exerciseForm, question: e.target.value })}
+                    placeholder="Nhập câu hỏi..."
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Loại câu hỏi</label>
+                    <select
+                      value={exerciseForm.question_type}
+                      onChange={(e) => setExerciseForm({ ...exerciseForm, question_type: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="multiple_choice">Trắc nghiệm</option>
+                      <option value="fill_blank">Điền từ</option>
+                      <option value="arrange">Sắp xếp từ</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Độ khó</label>
+                    <select
+                      value={exerciseForm.difficulty}
+                      onChange={(e) => setExerciseForm({ ...exerciseForm, difficulty: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value="easy">Dễ</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="hard">Khó</option>
+                    </select>
+                  </div>
+                </div>
+                {exerciseForm.question_type === 'multiple_choice' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Các lựa chọn</label>
+                    {exerciseForm.options.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2 mb-2">
+                        <span className="w-6 text-gray-500">{String.fromCharCode(65 + idx)}.</span>
+                        <Input
+                          value={opt}
+                          onChange={(e) => {
+                            const newOpts = [...exerciseForm.options];
+                            newOpts[idx] = e.target.value;
+                            setExerciseForm({ ...exerciseForm, options: newOpts });
+                          }}
+                          placeholder={`Lựa chọn ${idx + 1}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Đáp án đúng</label>
+                  <Input
+                    value={exerciseForm.correct_answer}
+                    onChange={(e) => setExerciseForm({ ...exerciseForm, correct_answer: e.target.value })}
+                    placeholder="Nhập đáp án đúng"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Giải thích</label>
+                  <textarea
+                    className="w-full p-3 border rounded-lg"
+                    value={exerciseForm.explanation}
+                    onChange={(e) => setExerciseForm({ ...exerciseForm, explanation: e.target.value })}
+                    placeholder="Giải thích đáp án..."
+                    rows={2}
+                  />
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowExerciseModal(false)} className="flex-1">
+                    Hủy
+                  </Button>
+                  <Button onClick={handleSaveExercise} className="flex-1" disabled={loadingStates.saving}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {loadingStates.saving ? 'Đang lưu...' : 'Lưu'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Vocabulary Modal */}
+        {showVocabularyModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold mb-4">
+                {editingVocab ? 'Sửa từ vựng' : 'Thêm từ vựng mới'}
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Từ (Hán tự)</label>
+                  <Input
+                    value={vocabForm.word}
+                    onChange={(e) => setVocabForm({ ...vocabForm, word: e.target.value })}
+                    placeholder="例如: 你好"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Pinyin</label>
+                  <Input
+                    value={vocabForm.pinyin}
+                    onChange={(e) => setVocabForm({ ...vocabForm, pinyin: e.target.value })}
+                    placeholder="nǐ hǎo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nghĩa</label>
+                  <Input
+                    value={vocabForm.meaning}
+                    onChange={(e) => setVocabForm({ ...vocabForm, meaning: e.target.value })}
+                    placeholder="Xin chào"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ví dụ</label>
+                  <textarea
+                    className="w-full p-3 border rounded-lg"
+                    value={vocabForm.example_sentence}
+                    onChange={(e) => setVocabForm({ ...vocabForm, example_sentence: e.target.value })}
+                    placeholder="Câu ví dụ..."
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Danh mục</label>
+                    <Input
+                      value={vocabForm.category}
+                      onChange={(e) => setVocabForm({ ...vocabForm, category: e.target.value })}
+                      placeholder="Từ vựng HSK"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Cấp độ HSK</label>
+                    <select
+                      value={vocabForm.hsk_level}
+                      onChange={(e) => setVocabForm({ ...vocabForm, hsk_level: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    >
+                      <option value={1}>HSK 1</option>
+                      <option value={2}>HSK 2</option>
+                      <option value={3}>HSK 3</option>
+                      <option value={4}>HSK 4</option>
+                      <option value={5}>HSK 5</option>
+                      <option value={6}>HSK 6</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowVocabularyModal(false)} className="flex-1">
+                    Hủy
+                  </Button>
+                  <Button onClick={handleSaveVocab} className="flex-1" disabled={loadingStates.saving}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {loadingStates.saving ? 'Đang lưu...' : 'Lưu'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Resource Modal */}
+        {showResourceModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-lg p-6">
+              <h2 className="text-xl font-bold mb-4">
+                {editingResource ? 'Sửa tài liệu' : 'Thêm tài liệu mới'}
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tiêu đề</label>
+                  <Input
+                    value={resourceForm.title}
+                    onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })}
+                    placeholder="Tài liệu bài học..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Loại tài liệu</label>
+                  <select
+                    value={resourceForm.type}
+                    onChange={(e) => setResourceForm({ ...resourceForm, type: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="pdf">PDF</option>
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
+                    <option value="link">Link</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">URL</label>
+                  <Input
+                    value={resourceForm.url}
+                    onChange={(e) => setResourceForm({ ...resourceForm, url: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Mô tả</label>
+                  <textarea
+                    className="w-full p-3 border rounded-lg"
+                    value={resourceForm.description}
+                    onChange={(e) => setResourceForm({ ...resourceForm, description: e.target.value })}
+                    placeholder="Mô tả tài liệu..."
+                    rows={3}
+                  />
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowResourceModal(false)} className="flex-1">
+                    Hủy
+                  </Button>
+                  <Button onClick={handleSaveResource} className="flex-1" disabled={loadingStates.saving}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {loadingStates.saving ? 'Đang lưu...' : 'Lưu'}
                   </Button>
                 </div>
               </div>

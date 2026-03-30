@@ -49,11 +49,19 @@ class NotificationSystem {
     return this.getUnread().length;
   }
 
+  // Generate unique ID
+  private generateId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}-${Math.random().toString(36).substring(2, 11)}`;
+  }
+
   // Add notification
   add(notification: Omit<Notification, 'id' | 'timestamp' | 'read'>): Notification {
     const newNotification: Notification = {
       ...notification,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: this.generateId(),
       timestamp: new Date(),
       read: false,
     };
@@ -303,9 +311,8 @@ class NotificationSystem {
 
 export const notificationSystem = new NotificationSystem();
 
-// Auto-create sample notifications for demo
-if (typeof window !== 'undefined') {
-  // Check if we should create demo notifications
+// Demo notifications - only in development mode
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   const hasNotifications = notificationSystem.getAll().length > 0;
   
   if (!hasNotifications) {

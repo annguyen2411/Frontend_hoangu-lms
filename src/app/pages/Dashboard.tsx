@@ -20,16 +20,12 @@ export function Dashboard() {
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  // Debug log
-  console.log('Dashboard - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated, 'profile:', profile);
-
   const handleExportData = () => {
     dataExport.downloadReport();
     toast.success('Đã xuất báo cáo học tập!');
   };
 
-  const handleSearch = (query: string, filters: unknown) => {
-    console.log('Search:', query, filters);
+  const handleSearch = (query: string, _filters: unknown) => {
     toast.info(`Tìm kiếm: ${query}`);
   };
 

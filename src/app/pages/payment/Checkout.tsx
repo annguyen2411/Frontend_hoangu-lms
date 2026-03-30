@@ -15,11 +15,13 @@ import { Loader2, Building2, Smartphone, Copy, Check, QrCode } from 'lucide-reac
 interface Course {
   id: string;
   title: string;
+  slug: string;
   description: string;
   thumbnail_url: string;
   price_vnd: number;
   original_price_vnd: number;
   discount_percent: number;
+  course_type: string;
   teacher_name: string;
 }
 
@@ -65,11 +67,36 @@ export default function Checkout() {
 
   const handleCheckout = async () => {
     if (!isAuthenticated) {
-      navigate('/?mode=login&redirect=/checkout/' + courseId);
+      navigate('/?auth=login&redirect=/checkout/' + courseId);
       return;
     }
 
     if (!course) return;
+
+    const isFreeCourse = course.course_type === 'free' || course.price_vnd === 0;
+
+    if (isFreeCourse) {
+      try {
+        const response = await fetch(`/api/enrollments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          },
+          body: JSON.stringify({ course_id: course.id })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          navigate(`/courses/${course.slug}/learn`);
+        } else {
+          toast.error(data.error || 'Đăng ký thất bại');
+        }
+      } catch (err) {
+        toast.error('Có lỗi xảy ra');
+      }
+      return;
+    }
 
     setIsProcessing(true);
     try {

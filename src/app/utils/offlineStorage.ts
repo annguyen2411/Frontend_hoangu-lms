@@ -121,13 +121,63 @@ class OfflineDB {
 
 export const offlineDB = new OfflineDB();
 
-// LocalStorage utilities for simple key-value storage
+// LocalStorage utilities with quota management
+const MAX_STORAGE_SIZE = 4 * 1024 * 1024; // 4MB safety limit
+const STORAGE_KEYS_TO_TRIM = ['hoangu-notifications', 'hoangu-flashcards', 'hoangu-card-reviews'];
+
 export const offlineStorage = {
-  set(key: string, value: any): void {
+  getUsedSize(): number {
+    let total = 0;
+    for (const key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        total += localStorage[key].length + key.length;
+      }
+    }
+    return total;
+  },
+
+  isQuotaExceeded(): boolean {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      return this.getUsedSize() >= MAX_STORAGE_SIZE;
+    } catch {
+      return false;
+    }
+  },
+
+  trimOldData(): void {
+    for (const key of STORAGE_KEYS_TO_TRIM) {
+      const data = this.get<any[]>(key);
+      if (data && data.length > 50) {
+        this.set(key, data.slice(0, 50));
+      }
+    }
+  },
+
+  set(key: string, value: any): boolean {
+    try {
+      const serialized = JSON.stringify(value);
+      const estimatedSize = serialized.length + key.length;
+      
+      if (this.getUsedSize() + estimatedSize > MAX_STORAGE_SIZE) {
+        this.trimOldData();
+        
+        if (this.getUsedSize() + estimatedSize > MAX_STORAGE_SIZE) {
+          console.warn('[OfflineStorage] Quota exceeded, clearing old data');
+          this.remove(key);
+          return false;
+        }
+      }
+      
+      localStorage.setItem(key, serialized);
+      return true;
     } catch (error) {
-      console.error('[OfflineStorage] Error saving to localStorage:', error);
+      if ((error as DOMException).name === 'QuotaExceededError') {
+        console.warn('[OfflineStorage] Quota exceeded');
+        this.trimOldData();
+      } else {
+        console.error('[OfflineStorage] Error saving to localStorage:', error);
+      }
+      return false;
     }
   },
 

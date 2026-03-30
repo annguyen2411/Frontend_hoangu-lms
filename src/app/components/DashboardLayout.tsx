@@ -1,25 +1,12 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router';
 import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Calendar, 
-  BarChart3, 
-  Users, 
-  Award,
-  Zap,
-  Settings,
-  ShoppingBag,
-  Sparkles,
-  CreditCard,
   Menu,
   X,
-  Trophy,
-  GraduationCap,
-  UserPlus
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginPrompt } from './LoginPrompt';
+import { studentNavigation, getDashboardTitle } from '../config/navigation';
 
 export function DashboardLayout() {
   const location = useLocation();
@@ -38,23 +25,15 @@ export function DashboardLayout() {
     return <LoginPrompt />;
   }
 
-  const navigation = [
-    { name: 'Tổng quan', href: '/dashboard', icon: LayoutDashboard, exact: true },
-    { name: 'Khóa học của tôi', href: '/dashboard/my-courses', icon: BookOpen },
-    { name: 'Lịch học', href: '/schedule', icon: Calendar },
-    { name: 'Phân tích', href: '/analytics', icon: BarChart3 },
-    { name: 'Cộng đồng', href: '/community', icon: Users },
-    { name: 'Nhóm học tập', href: '/study-groups', icon: Users },
-    { name: 'Bạn bè', href: '/friends', icon: UserPlus },
-    { name: 'Chứng chỉ', href: '/certificates', icon: Award },
-    { name: 'Flashcards', href: '/flashcards', icon: Sparkles },
-    { name: 'Nhiệm vụ', href: '/quests', icon: Zap },
-    { name: 'Thành tựu', href: '/achievements', icon: Trophy },
-    { name: 'Xếp hạng', href: '/leaderboard', icon: Trophy },
-    { name: 'Cửa hàng', href: '/shop', icon: ShoppingBag },
-    { name: 'Gamification', href: '/gamification', icon: CreditCard },
-    { name: 'Cài đặt', href: '/settings', icon: Settings },
-  ];
+  if (user?.role === 'instructor') {
+    return <Navigate to="/instructor/dashboard" replace />;
+  }
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  const navigation = studentNavigation;
 
   const isActive = (item: typeof navigation[0]) => {
     if (item.exact) {
@@ -74,7 +53,7 @@ export function DashboardLayout() {
           >
             {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
-          <h1 className="text-lg font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-lg font-bold text-foreground">{getDashboardTitle(user?.role)}</h1>
           <div className="w-10" /> {/* Spacer */}
         </div>
       </div>

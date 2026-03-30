@@ -114,9 +114,9 @@ export function Recommendations() {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                       <div>
-                        {course.price_vnd > 0 ? (
+                        {(course.price_vnd > 0 && course.course_type !== 'free') ? (
                           <>
                             <span className="text-lg font-bold text-red-600">
                               {course.price_vnd.toLocaleString('vi-VN')} ₫

@@ -17,9 +17,9 @@ export function Header() {
   const { profile, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
-    const mode = searchParams.get('mode');
-    if (mode === 'login' || mode === 'register') {
-      setAuthModalMode(mode);
+    const auth = searchParams.get('auth');
+    if (auth === 'login' || auth === 'register') {
+      setAuthModalMode(auth);
       setAuthModalOpen(true);
       setSearchParams({});
     }

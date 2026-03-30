@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Bell, Lock, Globe, Moon, Zap, Download } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Settings as SettingsIcon, User, Bell, Lock, Globe, Moon, Zap, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Label } from '../components/ui/Label';
 import { Switch } from '../components/ui/Switch';
 import { Separator } from '../components/ui/separator';
+import { Input } from '../components/ui/Input';
 import { OfflineCoursesManager } from '../components/OfflineCoursesManager';
 import { toast } from 'sonner';
 import { LoginPrompt } from '../components/LoginPrompt';
+import { api } from '../../lib/api';
 
 export function Settings() {
   const { profile, isAuthenticated, isLoading, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'offline'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'offline'>('profile');
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -22,6 +24,73 @@ export function Settings() {
     promotions: false,
   });
   const [saving, setSaving] = useState(false);
+
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordTouched, setPasswordTouched] = useState<Record<string, boolean>>({});
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Password validation
+  const passwordErrors = useMemo(() => {
+    const errors: Record<string, string> = {};
+    if (passwordTouched.currentPassword) {
+      if (!passwordData.currentPassword) {
+        errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
+      }
+    }
+    if (passwordTouched.newPassword) {
+      if (!passwordData.newPassword) {
+        errors.newPassword = 'Vui lòng nhập mật khẩu mới';
+      } else if (passwordData.newPassword.length < 6) {
+        errors.newPassword = 'Mật khẩu phải có ít nhất 6 ký tự';
+      }
+    }
+    if (passwordTouched.confirmPassword) {
+      if (!passwordData.confirmPassword) {
+        errors.confirmPassword = 'Vui lòng xác nhận mật khẩu';
+      } else if (passwordData.confirmPassword !== passwordData.newPassword) {
+        errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+      }
+    }
+    return errors;
+  }, [passwordData, passwordTouched]);
+
+  const isPasswordValid = useMemo(() => {
+    return passwordData.currentPassword && 
+           passwordData.newPassword.length >= 6 && 
+           passwordData.confirmPassword === passwordData.newPassword &&
+           !passwordErrors.currentPassword &&
+           !passwordErrors.newPassword &&
+           !passwordErrors.confirmPassword;
+  }, [passwordData, passwordErrors]);
+
+  const handlePasswordChange = async () => {
+    if (!isPasswordValid) return;
+    
+    setChangingPassword(true);
+    try {
+      const response = await api.auth.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      if (response.success) {
+        toast.success('Đổi mật khẩu thành công!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordTouched({});
+      } else {
+        toast.error(response.error || 'Không thể đổi mật khẩu');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Đã xảy ra lỗi');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handlePasswordBlur = (field: string) => {
+    setPasswordTouched(prev => ({ ...prev, [field]: true }));
+  };
 
   useEffect(() => {
     // Will show login prompt instead of navigating
@@ -114,6 +183,15 @@ export function Settings() {
             <Button
               variant="outline"
               className={`${
+                activeTab === 'security' ? 'bg-accent text-white' : ''
+              }`}
+              onClick={() => setActiveTab('security')}
+            >
+              Bảo mật
+            </Button>
+            <Button
+              variant="outline"
+              className={`${
                 activeTab === 'notifications' ? 'bg-accent text-white' : ''
               }`}
               onClick={() => setActiveTab('notifications')}
@@ -172,6 +250,104 @@ export function Settings() {
                   </div>
                   <Zap className="h-5 w-5 text-muted-foreground" />
                 </button>
+              </div>
+            </Card>
+          )}
+
+          {/* Security Settings */}
+          {activeTab === 'security' && (
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Lock className="h-5 w-5 text-[var(--theme-primary)]" />
+                <h2 className="text-xl font-bold text-foreground">Bảo mật</h2>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-foreground mb-4">Đổi mật khẩu</h3>
+                  <p className="text-sm text-muted-foreground mb-6">Cập nhật mật khẩu để bảo mật tài khoản của bạn</p>
+                  
+                  <div className="space-y-4 max-w-md">
+                    <div className="relative">
+                      <Label htmlFor="currentPassword">Mật khẩu hiện tại</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        placeholder="Nhập mật khẩu hiện tại"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        onBlur={() => handlePasswordBlur('currentPassword')}
+                        error={passwordErrors.currentPassword}
+                        className="mt-1"
+                      />
+                      {passwordTouched.currentPassword && !passwordErrors.currentPassword && passwordData.currentPassword && (
+                        <CheckCircle className="absolute right-3 top-9 h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <Label htmlFor="newPassword">Mật khẩu mới</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        onBlur={() => handlePasswordBlur('newPassword')}
+                        error={passwordErrors.newPassword}
+                        className="mt-1"
+                      />
+                      {passwordTouched.newPassword && !passwordErrors.newPassword && passwordData.newPassword.length >= 6 && (
+                        <CheckCircle className="absolute right-3 top-9 h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="Nhập lại mật khẩu mới"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        onBlur={() => handlePasswordBlur('confirmPassword')}
+                        error={passwordErrors.confirmPassword}
+                        className="mt-1"
+                      />
+                      {passwordTouched.confirmPassword && !passwordErrors.confirmPassword && passwordData.confirmPassword === passwordData.newPassword && (
+                        <CheckCircle className="absolute right-3 top-9 h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+
+                    <Button 
+                      onClick={handlePasswordChange}
+                      disabled={!isPasswordValid || changingPassword}
+                      className="w-full mt-4"
+                    >
+                      {changingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="my-6" />
+
+                <div>
+                  <h3 className="font-semibold text-foreground mb-2">Xác thực 2 yếu tố</h3>
+                  <p className="text-sm text-muted-foreground mb-4">Tính năng sẽ sớm được cập nhật</p>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium text-foreground">2FA</div>
+                        <div className="text-sm text-muted-foreground">Chưa kích hoạt</div>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" disabled>
+                      Sắp ra mắt
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
           )}

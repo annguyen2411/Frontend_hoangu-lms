@@ -17,8 +17,8 @@ export function LoginPrompt({
   const [searchParams] = useSearchParams();
   
   useEffect(() => {
-    const mode = searchParams.get('mode');
-    if (mode === 'login' || mode === 'register') {
+    const auth = searchParams.get('auth');
+    if (auth === 'login' || auth === 'register') {
       setIsModalOpen(true);
     }
   }, [searchParams]);

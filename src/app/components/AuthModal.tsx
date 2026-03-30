@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router';
 import { X, Mail, Lock, User, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { authUtils } from '../utils/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [formData, setFormData] = useState({
     name: '',
@@ -20,20 +21,29 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     confirmPassword: ''
   });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, register, isLoading: authLoading } = useAuth();
+  const { login, register, logout, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     setIsLogin(initialMode === 'login');
   }, [initialMode]);
 
+  // Reset form when modal opens/closes or mode changes
+  useEffect(() => {
+    if (!isOpen) {
+      setError('');
+      setSuccessMessage('');
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    if (mode === 'register') {
+    const auth = params.get('auth');
+    if (auth === 'register') {
       setIsLogin(false);
-    } else if (mode === 'login') {
+    } else if (auth === 'login') {
       setIsLogin(true);
     }
   }, []);
@@ -51,13 +61,19 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           return;
         }
 
-        const { error: loginError } = await login(formData.email, formData.password);
+        const { error: loginError, role } = await login(formData.email, formData.password);
         
         if (loginError) {
           setError(loginError.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
         } else {
           onClose();
-          window.location.reload();
+          if (role === 'admin') {
+            navigate('/admin');
+          } else if (role === 'instructor') {
+            navigate('/instructor');
+          } else {
+            navigate('/');
+          }
         }
       } else {
         if (!formData.name || !formData.email || !formData.password) {
@@ -77,26 +93,16 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         if (registerError) {
           setError(registerError.message || 'Đăng ký thất bại. Vui lòng thử lại.');
         } else {
-          onClose();
-          window.location.reload();
+          // Show success message and switch to login tab (don't auto-login)
+          const registeredEmail = formData.email;
+          await logout();
+          setSuccessMessage('Đăng ký thành công! Vui lòng đăng nhập.');
+          setIsLogin(true);
+          setFormData({ name: '', email: registeredEmail, password: '', confirmPassword: '' });
         }
       }
     } catch (err: any) {
       setError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await authUtils.login('test@example.com', '123456');
-      onClose();
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
@@ -203,6 +209,28 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             </div>
           )}
 
+          {successMessage && isLogin && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">{successMessage}</p>
+            </div>
+          )}
+
+          {isLogin && (
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="rounded border-gray-300" />
+                <span className="text-gray-600">Ghi nhớ đăng nhập</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate('/forgot-password'); }}
+                className="text-[var(--primary)] hover:underline font-medium"
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
+          )}
+
           <Button
             type="submit"
             className="w-full"
@@ -213,25 +241,6 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
             ) : (
               isLogin ? 'Đăng nhập' : 'Đăng ký'
             )}
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Hoặc</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleDemoLogin}
-            disabled={loading}
-          >
-            Dùng tài khoản demo
           </Button>
 
           <p className="text-center text-sm text-gray-600">

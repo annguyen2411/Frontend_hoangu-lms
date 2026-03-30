@@ -369,7 +369,7 @@ export function Courses() {
                           ) : course.discount_percent > 0 && course.original_price_vnd ? (
                             <div className="flex items-baseline gap-2">
                               <span className="text-xl font-bold text-[var(--primary)]">
-                                {course.price_vnd === 0 ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
+                                {(course.price_vnd === 0 || course.course_type === 'free') ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
                               </span>
                               <span className="text-sm text-gray-400 line-through">
                                 {course.original_price_vnd.toLocaleString('vi-VN')}đ
@@ -377,7 +377,7 @@ export function Courses() {
                             </div>
                           ) : (
                             <span className="text-xl font-bold text-[var(--primary)]">
-                              {course.price_vnd === 0 ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
+                              {(course.price_vnd === 0 || course.course_type === 'free') ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
                             </span>
                           )}
                         </div>

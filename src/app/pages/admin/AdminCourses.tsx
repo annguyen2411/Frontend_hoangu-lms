@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, X, Upload, Trash, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, X, Upload, Trash, Loader2, User, Check, XCircle } from 'lucide-react';
 import { useAdminCourses } from '../../hooks/useAdmin';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { toast } from 'sonner';
+import { api } from '../../../lib/api';
 import type { Course } from '../../../lib/database.types';
+
+interface UserOption {
+  id: string;
+  email: string;
+  full_name: string;
+  mshv: string;
+}
 
 interface CourseFormData {
   slug: string;
@@ -12,6 +20,7 @@ interface CourseFormData {
   description: string;
   thumbnail_url: string;
   teacher_name: string;
+  teacher_id: string;
   level: string;
   category: string;
   price_vnd: number;
@@ -22,6 +31,9 @@ interface CourseFormData {
   has_certificate: boolean;
   is_published: boolean;
   is_featured: boolean;
+  course_type: 'free' | 'paid';
+  is_free_for_all: boolean;
+  free_for_users: string[];
 }
 
 export function AdminCourses() {
@@ -32,6 +44,10 @@ export function AdminCourses() {
   const [currentTab, setCurrentTab] = useState<'basic' | 'details'>('basic');
   const [saving, setSaving] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
   
   const [formData, setFormData] = useState<CourseFormData>({
     slug: '',
@@ -39,6 +55,7 @@ export function AdminCourses() {
     description: '',
     thumbnail_url: '',
     teacher_name: '',
+    teacher_id: '',
     level: 'beginner',
     category: '',
     price_vnd: 0,
@@ -49,7 +66,33 @@ export function AdminCourses() {
     has_certificate: true,
     is_published: false,
     is_featured: false,
+    course_type: 'paid',
+    is_free_for_all: false,
+    free_for_users: [],
   });
+
+  // Fetch users when modal opens
+  useEffect(() => {
+    if (showModal && modalMode === 'edit') {
+      setLoadingUsers(true);
+      api.admin.getUsers({ limit: 500, role: 'student' }).then((res) => {
+        if (res.success) {
+          setUsers(res.data || []);
+        }
+      }).finally(() => setLoadingUsers(false));
+    }
+  }, [showModal, modalMode]);
+
+  // Search users by MSHV or name/email
+  const searchUsers = (term: string) => {
+    setUserSearchTerm(term);
+    setLoadingUsers(true);
+    api.admin.getUsers({ limit: 500, role: 'student', search: term }).then((res) => {
+      if (res.success) {
+        setUsers(res.data || []);
+      }
+    }).finally(() => setLoadingUsers(false));
+  };
 
   const filteredCourses = courses.filter((course) =>
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,6 +109,7 @@ export function AdminCourses() {
       description: '',
       thumbnail_url: '',
       teacher_name: '',
+      teacher_id: '',
       level: 'beginner',
       category: '',
       price_vnd: 0,
@@ -76,6 +120,9 @@ export function AdminCourses() {
       has_certificate: true,
       is_published: false,
       is_featured: false,
+      course_type: 'paid',
+      is_free_for_all: false,
+      free_for_users: [],
     });
     setShowModal(true);
   };
@@ -90,6 +137,7 @@ export function AdminCourses() {
       description: course.description || '',
       thumbnail_url: course.thumbnail_url || '',
       teacher_name: course.teacher_name || '',
+      teacher_id: (course as any).teacher_id || '',
       level: course.level,
       category: course.category || '',
       price_vnd: course.price_vnd,
@@ -100,7 +148,11 @@ export function AdminCourses() {
       has_certificate: course.has_certificate,
       is_published: course.is_published,
       is_featured: course.is_featured,
+      course_type: (course as any).course_type || 'paid',
+      is_free_for_all: (course as any).is_free_for_all || false,
+      free_for_users: (course as any).free_for_users || [],
     });
+    setShowUserDropdown(!(course as any).is_free_for_all);
     setShowModal(true);
   };
 
@@ -214,8 +266,10 @@ export function AdminCourses() {
                   </div>
                 </td>
                 <td className="p-4">
-                  {course.price_vnd === 0 ? (
-                    <span className="text-green-600 font-medium">Miễn phí</span>
+                  {(course as any).course_type === 'free' ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                      Miễn phí
+                    </span>
                   ) : (
                     <span>{course.price_vnd.toLocaleString()}đ</span>
                   )}
@@ -317,6 +371,17 @@ export function AdminCourses() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium mb-1">Giảng viên</label>
+                    <input
+                      type="text"
+                      value={formData.teacher_name}
+                      onChange={(e) => handleInputChange('teacher_name', e.target.value)}
+                      className="w-full p-2 border rounded"
+                      placeholder="Nhập tên giảng viên"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium mb-1">URL Thumbnail</label>
                     <input
                       type="url"
@@ -326,29 +391,137 @@ export function AdminCourses() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Giá (VND) *</label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        value={formData.price_vnd}
-                        onChange={(e) => handleInputChange('price_vnd', parseInt(e.target.value))}
-                        className="w-full p-2 border rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Giá gốc (VND)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.original_price_vnd}
-                        onChange={(e) => handleInputChange('original_price_vnd', parseInt(e.target.value))}
-                        className="w-full p-2 border rounded"
-                      />
+                  {/* Loại khóa học: Miễn phí / Có phí */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">Loại khóa học</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="course_type"
+                          value="paid"
+                          checked={formData.course_type === 'paid'}
+                          onChange={() => handleInputChange('course_type', 'paid')}
+                          className="w-4 h-4"
+                        />
+                        <span className="font-medium">Có phí</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="course_type"
+                          value="free"
+                          checked={formData.course_type === 'free'}
+                          onChange={() => handleInputChange('course_type', 'free')}
+                          className="w-4 h-4"
+                        />
+                        <span className="font-medium">Miễn phí</span>
+                      </label>
                     </div>
                   </div>
+
+                  {/* Nếu là khóa học miễn phí */}
+                  {formData.course_type === 'free' && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="free_type"
+                          checked={formData.is_free_for_all === true}
+                          onChange={() => { handleInputChange('is_free_for_all', true); setShowUserDropdown(false); }}
+                          className="w-4 h-4"
+                        />
+                        <span className="font-medium text-green-700">Miễn phí cho tất cả người dùng</span>
+                      </label>
+                      
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="free_type"
+                          checked={formData.is_free_for_all === false}
+                          onChange={() => { handleInputChange('is_free_for_all', false); setShowUserDropdown(true); }}
+                          className="w-4 h-4"
+                        />
+                        <span className="font-medium text-green-700">Miễn phí cho:</span>
+                      </label>
+
+                      {/* Dropdown chọn user */}
+                      {showUserDropdown && (
+                        <div className="ml-6 mt-2">
+                          <p className="text-sm text-green-600 mb-2">Chọn học viên được miễn phí:</p>
+                          <div className="mb-2">
+                            <input
+                              type="text"
+                              placeholder="Tìm theo MSHV, tên hoặc email..."
+                              value={userSearchTerm}
+                              onChange={(e) => searchUsers(e.target.value)}
+                              className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-green-500"
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto border rounded bg-white p-2 space-y-1">
+                            {loadingUsers ? (
+                              <p className="text-sm text-gray-500">Đang tải...</p>
+                            ) : users.length === 0 ? (
+                              <p className="text-sm text-gray-500">Không tìm thấy học viên</p>
+                            ) : (
+                              users.map((user) => (
+                                <label key={user.id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.free_for_users.includes(user.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        handleInputChange('free_for_users', [...formData.free_for_users, user.id]);
+                                      } else {
+                                        handleInputChange('free_for_users', formData.free_for_users.filter(id => id !== user.id));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded"
+                                  />
+                                  <span className="text-sm">
+                                    {user.mshv && <span className="font-mono text-blue-600 font-semibold mr-1">{user.mshv}</span>}
+                                    {user.full_name || user.email}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                          {formData.free_for_users.length > 0 && (
+                            <p className="text-sm text-green-600 mt-1">
+                              Đã chọn: {formData.free_for_users.length} học viên
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Giá - chỉ hiển thị khi là khóa học có phí */}
+                  {formData.course_type === 'paid' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Giá (VND) *</label>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          value={formData.price_vnd}
+                          onChange={(e) => handleInputChange('price_vnd', parseInt(e.target.value))}
+                          className="w-full p-2 border rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Giá gốc (VND)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.original_price_vnd}
+                          onChange={(e) => handleInputChange('original_price_vnd', parseInt(e.target.value))}
+                          className="w-full p-2 border rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 

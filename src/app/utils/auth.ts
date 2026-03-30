@@ -5,6 +5,7 @@ export interface AuthUser {
   name: string;
   email: string;
   avatar: string;
+  role: string;
   enrolledCourses: string[];
   progress: Record<string, number>;
 }
@@ -75,9 +76,15 @@ class AuthService {
     return { error: new Error('Not implemented') };
   }
 
-  async updatePassword(newPassword: string): Promise<{ error: Error | null }> {
+  async updatePassword(currentPassword: string, newPassword: string): Promise<{ error: Error | null }> {
+    if (!currentPassword) {
+      return { error: new Error('Vui lòng nhập mật khẩu hiện tại') };
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return { error: new Error('Mật khẩu mới phải có ít nhất 6 ký tự') };
+    }
     try {
-      const response = await api.auth.changePassword('', newPassword);
+      const response = await api.auth.changePassword(currentPassword, newPassword);
       if (!response.success) {
         return { error: new Error(response.error || 'Password update failed') };
       }
@@ -143,6 +150,7 @@ export const authUtils = {
       name: user?.full_name || 'User',
       email: user?.email || '',
       avatar: user?.avatar_url || '',
+      role: user?.role || 'student',
       enrolledCourses: [],
       progress: {},
     };

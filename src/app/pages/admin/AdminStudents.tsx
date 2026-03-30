@@ -13,6 +13,7 @@ interface User {
   role: string;
   level: number;
   coins: number;
+  mshv: string;
   created_at: string;
 }
 
@@ -23,8 +24,8 @@ export function AdminStudents() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({ full_name: '', email: '', password: '', role: 'student' });
-  const [editFormData, setEditFormData] = useState({ full_name: '', role: 'student', level: 1, coins: 0 });
+  const [formData, setFormData] = useState({ full_name: '', email: '', password: '', role: 'student', mshv: '' });
+  const [editFormData, setEditFormData] = useState({ full_name: '', role: 'student', level: 1, coins: 0, mshv: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,7 +62,7 @@ export function AdminStudents() {
       if (res.success) {
         setSuccess('Tạo người dùng thành công!');
         setShowModal(false);
-        setFormData({ full_name: '', email: '', password: '', role: 'student' });
+        setFormData({ full_name: '', email: '', password: '', role: 'student', mshv: '' });
         loadUsers();
       } else {
         setError(res.error || 'Lỗi khi tạo người dùng');
@@ -80,6 +81,7 @@ export function AdminStudents() {
       role: user.role,
       level: user.level || 1,
       coins: user.coins || 0,
+      mshv: user.mshv || '',
     });
     setShowEditModal(true);
   };
@@ -198,6 +200,7 @@ export function AdminStudents() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Người dùng</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">MSHV</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Vai trò</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Level</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Coins</th>
@@ -218,6 +221,9 @@ export function AdminStudents() {
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-mono text-sm font-semibold text-blue-600">{user.mshv || '-'}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getRoleColor(user.role)}`}>
@@ -305,7 +311,7 @@ export function AdminStudents() {
                 <select
                   required
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value, mshv: e.target.value === 'student' ? formData.mshv : '' })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
                 >
                   <option value="student">Học viên</option>
@@ -313,6 +319,17 @@ export function AdminStudents() {
                   <option value="admin">Quản trị viên</option>
                 </select>
               </div>
+              {formData.role === 'student' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã số học viên (MSHV)</label>
+                  <Input
+                    type="text"
+                    value={formData.mshv}
+                    onChange={(e) => setFormData({ ...formData, mshv: e.target.value })}
+                    placeholder="HV00123"
+                  />
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Hủy</Button>
                 <Button type="submit" disabled={submitting} className="flex-1">
@@ -347,7 +364,7 @@ export function AdminStudents() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
                 <select
                   value={editFormData.role}
-                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value, mshv: e.target.value === 'student' ? editFormData.mshv : '' })}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
                 >
                   <option value="student">Học viên</option>
@@ -355,6 +372,17 @@ export function AdminStudents() {
                   <option value="admin">Quản trị viên</option>
                 </select>
               </div>
+              {editFormData.role === 'student' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã số học viên (MSHV)</label>
+                  <Input
+                    type="text"
+                    value={editFormData.mshv}
+                    onChange={(e) => setEditFormData({ ...editFormData, mshv: e.target.value })}
+                    placeholder="HV00123"
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>

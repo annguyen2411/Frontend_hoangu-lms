@@ -26,11 +26,18 @@ class SpacedRepetitionSystem {
   private readonly CARDS_KEY = 'hoangu-flashcards';
   private readonly REVIEWS_KEY = 'hoangu-card-reviews';
 
+  private generateId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}-${Math.random().toString(36).substring(2, 11)}`;
+  }
+
   // Create flashcard
   createCard(card: Omit<FlashCard, 'id' | 'createdAt'>): FlashCard {
     const newCard: FlashCard = {
       ...card,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: this.generateId(),
       createdAt: new Date()
     };
 

@@ -59,12 +59,38 @@ export function CourseDetail() {
     setExpandedLessons(newExpanded);
   };
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (!isAuthenticated) {
-      navigate('/?mode=login');
+      navigate('/?auth=login');
       return;
     }
-    navigate(`/checkout/${course?.id}`);
+    
+    const isFreeCourse = course?.course_type === 'free' || course?.price_vnd === 0;
+    
+    if (isFreeCourse) {
+      try {
+        const response = await fetch(`/api/enrollments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          },
+          body: JSON.stringify({ course_id: course.id })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          navigate(`/courses/${course.slug}/learn`);
+        } else {
+          alert(data.error || 'Đăng ký thất bại');
+        }
+      } catch (err) {
+        console.error('Enroll error:', err);
+        alert('Có lỗi xảy ra');
+      }
+    } else {
+      navigate(`/checkout/${course?.id}`);
+    }
   };
 
   if (courseLoading || checkingEnrollment) {
@@ -177,7 +203,7 @@ export function CourseDetail() {
                       </>
                     ) : (
                       <div className="text-3xl font-bold text-gray-900">
-                        {course.price_vnd === 0 ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
+                        {(course.price_vnd === 0 || course.course_type === 'free') ? 'Miễn phí' : `${course.price_vnd.toLocaleString('vi-VN')}đ`}
                       </div>
                     )}
                   </div>
@@ -194,7 +220,7 @@ export function CourseDetail() {
                       onClick={handleEnroll}
                       className="w-full py-4 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-lg font-bold text-lg hover:opacity-90 transition-opacity mb-3"
                     >
-                      {course.price_vnd === 0 ? 'Đăng ký ngay' : 'Mua ngay'}
+                      {(course.price_vnd === 0 || course.course_type === 'free') ? 'Đăng ký ngay' : 'Mua ngay'}
                     </button>
                   )}
 

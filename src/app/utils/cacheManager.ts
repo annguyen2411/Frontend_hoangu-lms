@@ -14,7 +14,7 @@ class CacheManager {
     api: 'hoangu-api-v1',
   };
 
-  // Get cache info
+  // Get cache info - optimized to avoid memory issues
   async getCacheInfo(): Promise<CacheInfo[]> {
     if (!('caches' in window)) return [];
 
@@ -26,11 +26,30 @@ class CacheManager {
       const keys = await cache.keys();
       
       let totalSize = 0;
+      let processedCount = 0;
+      const maxItemsToScan = 100; // Limit scanning to avoid memory issues
+
       for (const request of keys) {
+        if (processedCount >= maxItemsToScan) break;
+        
         const response = await cache.match(request);
         if (response) {
-          const blob = await response.blob();
-          totalSize += blob.size;
+          // Use content-length header instead of reading blob
+          const contentLength = response.headers.get('content-length');
+          if (contentLength) {
+            totalSize += parseInt(contentLength, 10);
+          } else {
+            // Fallback: sample first 10 items only
+            if (processedCount < 10) {
+              try {
+                const blob = await response.blob();
+                totalSize += blob.size;
+              } catch {
+                // Skip if can't read
+              }
+            }
+          }
+          processedCount++;
         }
       }
 

@@ -388,7 +388,7 @@ export function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/register"
+              to="/?auth=register"
               className="px-10 py-4 bg-white text-foreground font-normal tracking-wide hover:bg-white/90 transition-colors"
             >
               Đăng ký miễn phí

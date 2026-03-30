@@ -153,7 +153,7 @@ export function CourseCarousel({ courses, enrolledCourseIds = [] }: CourseCarous
                           ) : discountPercent > 0 ? (
                             <>
                               <span className="text-2xl font-bold text-error">
-                                {course.price_vnd === 0 ? 'Miễn phí' : `${course.price_vnd.toLocaleString()}đ`}
+                                {(course.price_vnd === 0 || course.course_type === 'free') ? 'Miễn phí' : `${course.price_vnd.toLocaleString()}đ`}
                               </span>
                               <span className="ml-2 text-sm text-gray-400 line-through">
                                 {course.original_price_vnd?.toLocaleString()}đ
@@ -161,7 +161,7 @@ export function CourseCarousel({ courses, enrolledCourseIds = [] }: CourseCarous
                             </>
                           ) : (
                             <span className="text-2xl font-bold text-gray-900">
-                              {course.price_vnd === 0 ? 'Miễn phí' : `${course.price_vnd.toLocaleString()}đ`}
+                              {(course.price_vnd === 0 || course.course_type === 'free') ? 'Miễn phí' : `${course.price_vnd.toLocaleString()}đ`}
                             </span>
                           )}
                         </div>
