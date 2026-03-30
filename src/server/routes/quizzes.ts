@@ -462,7 +462,7 @@ router.post('/:id/submit',
         [id]
       );
 
-      const questionsMap = new Map(questionsResult.rows.map((q: any) => [q.id, q]));
+      const questionsMap: Map<string, any> = new Map(questionsResult.rows.map((q: any) => [q.id, q]));
 
       let totalPoints = 0;
       let earnedPoints = 0;
