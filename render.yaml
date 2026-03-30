@@ -3,7 +3,7 @@ services:
     name: hoangu-lms-api
     env: node
     region: oregon
-    buildCommand: cd src/server && npm install --include=dev && npm run build
+    buildCommand: cd src/server && rm -f package-lock.json && npm install --include=dev && npm run build
     startCommand: cd src/server && npm start
     envVars:
       - key: NODE_ENV
