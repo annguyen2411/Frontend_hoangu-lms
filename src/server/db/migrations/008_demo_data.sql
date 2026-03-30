@@ -20,7 +20,7 @@ INSERT INTO courses (
   'free',
   true,
   'Tiếng Trung',
-  'Cơ bản',
+  'beginner',
   10,
   5,
   true,
