@@ -1,0 +1,54 @@
+{
+  "name": "HoaNgữ - Học tiếng Hoa chuẩn Bắc Kinh",
+  "short_name": "HoaNgữ",
+  "description": "Học tiếng Hoa chuẩn Bắc Kinh - Chỉ 90 ngày nói thành thạo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Mở dashboard học tập",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Khóa học",
+      "short_name": "Courses",
+      "description": "Xem khóa học",
+      "url": "/courses"
+    },
+    {
+      "name": "Nhiệm vụ",
+      "short_name": "Quests",
+      "description": "Xem nhiệm vụ",
+      "url": "/quests"
+    }
+  ],
+  "prefer_related_applications": false
+}
