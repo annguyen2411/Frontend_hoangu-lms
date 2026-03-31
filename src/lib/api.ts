@@ -1,51 +1,7 @@
 import type { ApiResponse } from '../types/database';
 
-<<<<<<< HEAD
-// Use proxy through Netlify - no CORS issues
-const API_BASE_URL = '/api';
-=======
-<<<<<<< HEAD
-// Use proxy through Netlify - no CORS issues
-const API_BASE_URL = '/api';
-=======
-<<<<<<< HEAD
 // Static API URL for production - always use Render backend
 const API_BASE_URL = 'https://hoangu-lms-api.onrender.com/api';
-=======
-<<<<<<< HEAD
-// Static API URL for production - always use Render backend
-const API_BASE_URL = 'https://hoangu-lms-api.onrender.com/api';
-=======
-<<<<<<< HEAD
-// Static API URL for production - always use Render backend
-const API_BASE_URL = 'https://hoangu-lms-api.onrender.com/api';
-=======
-// Dynamic API URL - uses environment variable or constructs based on environment
-const getApiUrl = () => {
-  // Use environment variable if set (for production)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  // Development: localhost
-  if (import.meta.env.DEV || typeof window === 'undefined') {
-    return 'http://localhost:3000/api';
-  }
-  // Production: use same domain with /api
-  const protocol = window.location.protocol;
-  const hostname = window.location.hostname;
-  // When on production, try to connect to backend on render or same domain
-  if (hostname === 'hoangu.techhave.com' || hostname === 'www.hoangu.techhave.com') {
-    return 'https://hoangu-lms-api.onrender.com/api';
-  }
-  return `${protocol}//${hostname}:3000/api`;
-};
-
-const API_BASE_URL = getApiUrl();
->>>>>>> f29fe1a95bef9fd60de6c86bd8ce50d5d6db9011
->>>>>>> 37a48f8596c8db4e143f765f221f893167753b47
->>>>>>> 8317de3538661c0e25f498476a346ec12f74940d
->>>>>>> 09709f3537b48a026a10ad493d1f44513a852194
->>>>>>> 2442c62b22334f3b25f7749ee3a0c71a892cbffb
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
