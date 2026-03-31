@@ -1,18 +1,7 @@
 import type { ApiResponse } from '../types/database';
 
-// Dynamic API URL - uses current host if available, fallback to env or localhost
-const getApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  // For network access, construct URL from current location
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return `${window.location.protocol}//${window.location.hostname}:3000/api`;
-  }
-  return 'http://localhost:3000/api';
-};
-
-const API_BASE_URL = getApiUrl();
+// Static API URL for production - always use Render backend
+const API_BASE_URL = 'https://hoangu-lms-api.onrender.com/api';
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
