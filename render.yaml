@@ -1,0 +1,51 @@
+services:
+  # Backend API
+  - type: web
+    name: hoangu-lms-api
+    env: node
+    region: oregon
+    buildCommand: cd src/server && rm -f package-lock.json && npm install --include=dev && npm run build
+    startCommand: cd src/server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DB_HOST
+        value: ep-restless-silence-amk7gr5l-pooler.c-5.us-east-1.aws.neon.tech
+      - key: DB_NAME
+        value: hoangu_lms
+      - key: DB_USER
+        value: neondb_owner
+      - key: DB_PASSWORD
+        value: npg_6h7LWKgzXVMx
+        sync: false
+      - key: DB_PORT
+        value: 5432
+      - key: JWT_SECRET
+        value: hoangu_lms_prod_secret_key_change_this_in_production
+        sync: false
+      - key: FRONTEND_URL
+        value: https://hoangu.techhave.com
+      - key: VNP_RETURNURL
+        value: https://hoangu.techhave.com/payment/return
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_DIR
+        value: logs
+    autoDeploy: true
+    healthCheckPath: /api/health
+
+  # Frontend Static Site
+  - type: web
+    name: hoangu-lms-frontend
+    env: static
+    region: oregon
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://hoangu-lms-api.onrender.com/api
+    autoDeploy: true
