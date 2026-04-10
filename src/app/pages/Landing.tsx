@@ -22,7 +22,6 @@ import {
   Phone,
   MapPin,
   Crown,
-  Fire,
   CheckCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
