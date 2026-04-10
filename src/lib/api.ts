@@ -547,4 +547,30 @@ class ApiClient {
   };
 }
 
+home = {
+    getStats: () => this.get<ApiResponse<{
+      totalLessons: number;
+      totalStudents: number;
+      satisfactionRate: number;
+      totalBadges: number;
+    }>>('/home/stats'),
+  };
+
+  quizzes = {
+    getDaily: () => this.get<ApiResponse<{
+      question: string;
+      options: { text: string; isCorrect: boolean }[];
+      correctFeedback: string;
+    }>>('/quizzes/daily'),
+    submitAnswer: (quizId: string, answerIndex: number) =>
+      this.post<ApiResponse<{ correct: boolean; xpEarned: number }>('/quizzes/submit', { quiz_id: quizId, answer_index: answerIndex })),
+  };
+
+  testimonials = {
+    getAll: () => this.get<ApiResponse<{ quote: string; author: string }[]>>('/testimonials'),
+    submit: (quote: string, rating: number) =>
+      this.post<ApiResponse<any>>('/testimonials', { quote, rating })),
+  };
+}
+
 export const api = new ApiClient();

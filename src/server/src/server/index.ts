@@ -45,31 +45,38 @@ import instructorsRoutes from './routes/instructors';
 import studentRoutes from './routes/student';
 import quizRoutes from './routes/quizzes';
 import analyticsRoutes from './routes/analytics';
+import homeRoutes from './routes/home';
+import testimonialsRoutes from './routes/testimonials';
+import publicRoutes from './routes/public';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
-app.use(cors({
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      process.env.FRONTEND_URL,
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ].filter(Boolean);
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ].filter(Boolean);
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(requestLogger);
-app.use(morgan('combined', {
-  stream: { write: (message: string) => logger.info(message.trim()) },
-}));
+app.use(
+  morgan('combined', {
+    stream: { write: (message: string) => logger.info(message.trim()) },
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -96,6 +103,9 @@ app.use('/api/instructors', instructorsRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/home', homeRoutes);
+app.use('/api/testimonials', testimonialsRoutes);
+app.use('/api', publicRoutes);
 
 app.use('/api/docs', swaggerRouter, swaggerSetup);
 app.get('/api/docs.json', (req, res) => {
@@ -107,17 +117,17 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logError('Server Error:', { 
-    message: err.message, 
+  logError('Server Error:', {
+    message: err.message,
     stack: err.stack,
     url: req.url,
-    method: req.method 
+    method: req.method,
   });
-  
+
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({ success: false, error: 'Token không hợp lệ' });
   }
-  
+
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({ success: false, error: 'Token đã hết hạn' });
   }
